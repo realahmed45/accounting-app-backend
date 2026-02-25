@@ -369,7 +369,7 @@ export const resendInvitation = async (req, res) => {
       });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${invitation.token}`;
     const inviterFirst = invitation.invitedByUserId?.firstName || "";
     const inviterLast =

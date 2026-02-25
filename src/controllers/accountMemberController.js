@@ -164,7 +164,7 @@ export const addMember = async (req, res) => {
       viewOnly,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${token}`;
     const inviterName =
       `${req.user.firstName || ""} ${req.user.familyName || req.user.lastName || ""}`.trim() ||
@@ -396,7 +396,7 @@ export const transferOwnership = async (req, res) => {
       expiresAt,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${token}`;
     const inviterName =
       `${req.user.firstName || ""} ${req.user.familyName || req.user.lastName || ""}`.trim() ||
