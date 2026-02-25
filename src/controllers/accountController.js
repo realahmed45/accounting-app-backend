@@ -154,14 +154,24 @@ export const createAccount = async (req, res) => {
   }
 };
 
-// @desc    Get all accounts for logged in user
+// @desc    Get all accounts for logged in user (where they are a member)
 // @route   GET /api/accounts
 // @access  Private
 export const getAccounts = async (req, res) => {
   try {
-    const accounts = await Account.find({ userId: req.user.id }).sort({
-      createdAt: -1,
-    });
+    const memberships = await AccountMember.find({ userId: req.user.id })
+      .populate("accountId")
+      .sort({ createdAt: -1 });
+
+    const accounts = memberships
+      .filter((m) => m.accountId) // Filter out any broken references
+      .map((m) => {
+        const acc = m.accountId.toObject();
+        acc.role = m.role;
+        acc.permissions = m.permissions;
+        acc.viewOnly = m.viewOnly;
+        return acc;
+      });
 
     res.status(200).json({
       success: true,
@@ -181,22 +191,22 @@ export const getAccounts = async (req, res) => {
 // @access  Private
 export const getAccount = async (req, res) => {
   try {
-    const account = await Account.findById(req.params.id);
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    }).populate("accountId");
 
-    if (!account) {
-      return res.status(404).json({
-        success: false,
-        message: "Account not found",
-      });
-    }
-
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    if (!member) {
+      return res.status(403).json({
         success: false,
         message: "Not authorized to access this account",
       });
     }
+
+    const account = member.accountId.toObject();
+    account.role = member.role;
+    account.permissions = member.permissions;
+    account.viewOnly = member.viewOnly;
 
     res.status(200).json({
       success: true,
@@ -224,11 +234,16 @@ export const updateAccount = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Only the owner can update account settings
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member || member.role !== "owner") {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized to update this account",
+        message: "Only the account owner can update account settings",
       });
     }
 
@@ -263,11 +278,16 @@ export const deleteAccount = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Only the owner can delete the account
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member || member.role !== "owner") {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized to delete this account",
+        message: "Only the account owner can delete this account",
       });
     }
 
@@ -299,11 +319,16 @@ export const getCategories = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Caller must be a member
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Not authorized to access this account's categories",
       });
     }
 
@@ -338,11 +363,16 @@ export const createCategory = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Caller must have addCategories permission or be owner
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member || (member.role !== "owner" && !member.permissions.addCategories)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "You don't have permission to add categories",
       });
     }
 
@@ -377,11 +407,16 @@ export const getPeople = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Caller must be a member
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Not authorized to access this account's people list",
       });
     }
 
@@ -416,11 +451,16 @@ export const createPerson = async (req, res) => {
       });
     }
 
-    // Make sure user owns account
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Caller must have addUser permission or be owner
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (!member || (member.role !== "owner" && !member.permissions.addUser)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "You don't have permission to add people",
       });
     }
 

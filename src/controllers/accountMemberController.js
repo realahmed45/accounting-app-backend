@@ -209,7 +209,7 @@ export const addMember = async (req, res) => {
 // @access  Private — must be owner or have addUser permission
 export const updateMember = async (req, res) => {
   try {
-    const { permissions, displayName } = req.body;
+    const { permissions, displayName, viewOnly } = req.body;
 
     const account = await findAccount(req.params.id);
     if (!account) {
@@ -261,6 +261,10 @@ export const updateMember = async (req, res) => {
         }
       }
       target.markModified("permissions");
+    }
+
+    if (viewOnly !== undefined) {
+      target.viewOnly = viewOnly;
     }
 
     await target.save();

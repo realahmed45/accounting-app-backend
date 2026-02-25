@@ -1,13 +1,10 @@
-import BankAccount from "../models/BankAccount.js";
-import Account from "../models/Account.js";
+import AccountMember from "../models/AccountMember.js";
 
-// Helper – verify account ownership
-const verifyAccountOwnership = async (accountId, userId) => {
-  const account = await Account.findById(accountId);
-  if (!account) return { error: "Account not found", status: 404 };
-  if (account.userId.toString() !== userId)
-    return { error: "Not authorized", status: 401 };
-  return { account };
+// Helper – verify account membership and return member record
+const verifyAccountMembership = async (accountId, userId) => {
+  const member = await AccountMember.findOne({ accountId, userId });
+  if (!member) return { error: "Not authorized to access this account", status: 403 };
+  return { member };
 };
 
 // @desc    Get all bank accounts for an account
@@ -15,7 +12,7 @@ const verifyAccountOwnership = async (accountId, userId) => {
 // @access  Private
 export const getBankAccounts = async (req, res) => {
   try {
-    const { error, status } = await verifyAccountOwnership(
+    const { error, status, member } = await verifyAccountMembership(
       req.params.id,
       req.user.id,
     );
@@ -42,12 +39,16 @@ export const getBankAccounts = async (req, res) => {
 // @access  Private
 export const createBankAccount = async (req, res) => {
   try {
-    const { error, status } = await verifyAccountOwnership(
+    const { error, status, member } = await verifyAccountMembership(
       req.params.id,
       req.user.id,
     );
     if (error)
       return res.status(status).json({ success: false, message: error });
+
+    if (member.role !== "owner" && !member.permissions.addBankAccount) {
+      return res.status(403).json({ success: false, message: "No permission to add bank accounts" });
+    }
 
     const { name, bankName, accountType, lastFourDigits, balance, currency } =
       req.body;
@@ -80,7 +81,7 @@ export const createBankAccount = async (req, res) => {
 // @access  Private
 export const updateBankAccount = async (req, res) => {
   try {
-    const { error, status } = await verifyAccountOwnership(
+    const { error, status, member } = await verifyAccountMembership(
       req.params.id,
       req.user.id,
     );
@@ -110,7 +111,7 @@ export const updateBankAccount = async (req, res) => {
 // @access  Private
 export const deleteBankAccount = async (req, res) => {
   try {
-    const { error, status } = await verifyAccountOwnership(
+    const { error, status, member } = await verifyAccountMembership(
       req.params.id,
       req.user.id,
     );

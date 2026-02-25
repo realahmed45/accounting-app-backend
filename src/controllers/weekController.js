@@ -1,5 +1,5 @@
 import Week from "../models/Week.js";
-import Account from "../models/Account.js";
+import AccountMember from "../models/AccountMember.js";
 import Expense from "../models/Expense.js";
 import BankAccount from "../models/BankAccount.js";
 
@@ -17,9 +17,9 @@ export const addCashToBox = async (req, res) => {
     const week = await Week.findById(req.params.id);
     if (!week) return res.status(404).json({ success: false, message: "Week not found" });
 
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({ success: false, message: "Not authorized" });
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(401).json({ success: false, message: "Not a member of this account" });
     }
 
     if (week.isLocked) {
@@ -48,19 +48,18 @@ export const createWeek = async (req, res) => {
   try {
     const { accountId, startDate, endDate, cashBoxBalance } = req.body;
 
-    // Verify account ownership
-    const account = await Account.findById(accountId);
-    if (!account) {
-      return res.status(404).json({
+    const member = await AccountMember.findOne({ accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Account not found",
+        message: "Not a member of this account",
       });
     }
 
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    if (member.role !== "owner" && !member.permissions.createAccountDownward) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to create weeks/sub-accounts",
       });
     }
 
@@ -88,19 +87,11 @@ export const createWeek = async (req, res) => {
 // @access  Private
 export const getWeeksByAccount = async (req, res) => {
   try {
-    const account = await Account.findById(req.params.accountId);
-
-    if (!account) {
-      return res.status(404).json({
+    const member = await AccountMember.findOne({ accountId: req.params.accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Account not found",
-      });
-    }
-
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized",
+        message: "Not a member of this account",
       });
     }
 
@@ -135,12 +126,11 @@ export const getWeek = async (req, res) => {
       });
     }
 
-    // Verify ownership through account
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Not a member of this account",
       });
     }
 
@@ -170,12 +160,11 @@ export const updateWeek = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to update weeks",
       });
     }
 
@@ -218,12 +207,11 @@ export const lockWeek = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to lock weeks",
       });
     }
 
@@ -264,12 +252,11 @@ export const deleteWeek = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member || member.role !== "owner") {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Only the account owner can delete weeks",
       });
     }
 
@@ -320,12 +307,11 @@ export const transferBankToCash = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to transfer funds",
       });
     }
 

@@ -1,6 +1,6 @@
 import Expense from "../models/Expense.js";
 import Week from "../models/Week.js";
-import Account from "../models/Account.js";
+import AccountMember from "../models/AccountMember.js";
 import BillPhoto from "../models/BillPhoto.js";
 import BankAccount from "../models/BankAccount.js";
 
@@ -20,19 +20,19 @@ export const createExpense = async (req, res) => {
       bankAccountId,
     } = req.body;
 
-    // Verify account ownership
-    const account = await Account.findById(accountId);
-    if (!account) {
-      return res.status(404).json({
+    // Verify account membership
+    const member = await AccountMember.findOne({ accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Account not found",
+        message: "Not a member of this account",
       });
     }
 
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    if (member.role !== "owner" && !member.permissions.makeExpense) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to create expenses",
       });
     }
 
@@ -131,12 +131,12 @@ export const getExpensesByWeek = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(week.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Verify membership
+    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Not a member of this account",
       });
     }
 
@@ -162,19 +162,12 @@ export const getExpensesByWeek = async (req, res) => {
 // @access  Private
 export const getExpensesByAccount = async (req, res) => {
   try {
-    const account = await Account.findById(req.params.accountId);
+    const member = await AccountMember.findOne({ accountId: req.params.accountId, userId: req.user.id });
 
-    if (!account) {
-      return res.status(404).json({
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Account not found",
-      });
-    }
-
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized",
+        message: "Not authorized to access this account",
       });
     }
 
@@ -220,12 +213,12 @@ export const getExpense = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(expense.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Verify membership
+    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
+    if (!member) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "Not authorized to access this expense",
       });
     }
 
@@ -261,12 +254,12 @@ export const updateExpense = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(expense.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Verify membership and permission
+    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to update expenses",
       });
     }
 
@@ -310,12 +303,12 @@ export const deleteExpense = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(expense.accountId);
-    if (account.userId.toString() !== req.user.id) {
-      return res.status(401).json({
+    // Verify membership and permission
+    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
+      return res.status(403).json({
         success: false,
-        message: "Not authorized",
+        message: "No permission to delete expenses",
       });
     }
 
