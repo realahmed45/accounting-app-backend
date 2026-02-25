@@ -173,6 +173,38 @@ export const updateDetails = async (req, res) => {
   }
 };
 
+// @desc    Verify current user's password (used by view-only gate)
+// @route   POST /api/auth/verify-password
+// @access  Private
+export const verifyPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Password is required" });
+    }
+
+    const user = await User.findById(req.user.id).select("+password");
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect password" });
+    }
+
+    res.status(200).json({ success: true, message: "Password verified" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Update password
 // @route   PUT /api/auth/updatepassword
 // @access  Private

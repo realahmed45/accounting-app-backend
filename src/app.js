@@ -10,6 +10,8 @@ import accountRoutes from "./routes/accounts.js";
 import weekRoutes from "./routes/weeks.js";
 import expenseRoutes from "./routes/expenses.js";
 import photoRoutes from "./routes/photos.js";
+import invitationRoutes from "./routes/invitations.js";
+import scheduleRoutes from "./routes/schedule.js";
 
 // Load env vars
 dotenv.config();
@@ -32,6 +34,8 @@ app.use("/api/accounts", accountRoutes);
 app.use("/api/weeks", weekRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/photos", photoRoutes);
+app.use("/api/invitations", invitationRoutes);
+app.use("/api/accounts", scheduleRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {

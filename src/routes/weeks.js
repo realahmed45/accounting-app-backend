@@ -6,6 +6,8 @@ import {
   updateWeek,
   lockWeek,
   deleteWeek,
+  transferBankToCash,
+  addCashToBox,
 } from "../controllers/weekController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -21,5 +23,7 @@ router
   .delete(protect, deleteWeek);
 
 router.put("/:id/lock", protect, lockWeek);
+router.post("/:id/transfer-bank-to-cash", protect, transferBankToCash);
+router.post("/:id/add-cash", protect, addCashToBox);
 
 export default router;

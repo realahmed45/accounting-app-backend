@@ -1,25 +1,6 @@
 import BillPhoto from "../models/BillPhoto.js";
 import Expense from "../models/Expense.js";
 import Account from "../models/Account.js";
-import cloudinary from "../config/cloudinary.js";
-import streamifier from "streamifier";
-
-// Helper function to upload to Cloudinary
-const uploadToCloudinary = (buffer) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: "accounting-app/bills",
-        resource_type: "auto",
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      },
-    );
-    streamifier.createReadStream(buffer).pipe(uploadStream);
-  });
-};
 
 // @desc    Upload bill photo
 // @route   POST /api/photos/upload/:expenseId
@@ -51,15 +32,14 @@ export const uploadBillPhoto = async (req, res) => {
       });
     }
 
-    // Upload to Cloudinary
-    const result = await uploadToCloudinary(req.file.buffer);
+    // Convert buffer to base64 data URL and save directly to DB
+    const base64Data = req.file.buffer.toString("base64");
+    const imageData = `data:${req.file.mimetype};base64,${base64Data}`;
 
-    // Save to database
     const billPhoto = await BillPhoto.create({
       expenseId: req.params.expenseId,
       accountId: expense.accountId,
-      fileUrl: result.secure_url,
-      publicId: result.public_id,
+      imageData,
       fileName: req.file.originalname,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
@@ -140,9 +120,6 @@ export const deletePhoto = async (req, res) => {
         message: "Not authorized",
       });
     }
-
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(photo.publicId);
 
     // Delete from database
     await photo.deleteOne();

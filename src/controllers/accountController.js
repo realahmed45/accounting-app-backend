@@ -1,22 +1,111 @@
 import Account from "../models/Account.js";
 import Category from "../models/Category.js";
 import Person from "../models/Person.js";
+import AccountMember from "../models/AccountMember.js";
+
+const ALL_PERMISSIONS = {
+  calculateCash: true,
+  accessSettings: true,
+  addUser: true,
+  addCategories: true,
+  addBankAccount: true,
+  makeExpense: true,
+  createAccountDownward: true,
+  createAccountUpward: true,
+};
 
 // @desc    Create new account
 // @route   POST /api/accounts
 // @access  Private
 export const createAccount = async (req, res) => {
   try {
-    const { accountName, currency, timezone } = req.body;
+    const {
+      accountName,
+      accountType,
+      category,
+      subcategory,
+      customDescription,
+      description,
+      currency,
+      timezone,
+    } = req.body;
+
+    // Personal account — no category required
+    if (accountType === "personal") {
+      const account = await Account.create({
+        accountName: accountName || "Personal",
+        accountType: "personal",
+        description: description || null,
+        userId: req.user.id,
+        ownerId: req.user.id,
+        currency: currency || "USD",
+        timezone: timezone || "UTC",
+      });
+
+      // Create default categories
+      const defaultCategories = [
+        "Food & Dining",
+        "Transportation",
+        "Utilities",
+        "Shopping",
+        "Entertainment",
+        "Healthcare",
+        "Other",
+      ];
+      await Promise.all(
+        defaultCategories.map((categoryName) =>
+          Category.create({
+            accountId: account._id,
+            name: categoryName,
+            isDefault: true,
+          }),
+        ),
+      );
+
+      // Bootstrap creator as owner member
+      await AccountMember.create({
+        accountId: account._id,
+        userId: req.user.id,
+        displayName:
+          `${req.user.firstName} ${req.user.lastName}`.trim() || req.user.email,
+        role: "owner",
+        permissions: { ...ALL_PERMISSIONS },
+        invitedBy: null,
+      });
+
+      return res.status(201).json({ success: true, data: account });
+    }
+
+    // Business account — category required
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        message: "Category is required for business accounts",
+      });
+    }
+
+    if (category === "Other" && !customDescription) {
+      return res.status(400).json({
+        success: false,
+        message: "Custom description is required for Other category",
+      });
+    }
 
     const account = await Account.create({
-      accountName,
+      accountName:
+        accountName ||
+        (category === "Other" ? customDescription : subcategory || category),
+      accountType: "business",
+      category,
+      subcategory: subcategory || null,
+      customDescription: customDescription || null,
       userId: req.user.id,
+      ownerId: req.user.id,
       currency: currency || "USD",
       timezone: timezone || "UTC",
     });
 
-    // Create default categories
+    // Create default categories for business account
     const defaultCategories = [
       "Food & Dining",
       "Transportation",
@@ -26,7 +115,6 @@ export const createAccount = async (req, res) => {
       "Healthcare",
       "Other",
     ];
-
     await Promise.all(
       defaultCategories.map((categoryName) =>
         Category.create({
@@ -37,10 +125,18 @@ export const createAccount = async (req, res) => {
       ),
     );
 
-    res.status(201).json({
-      success: true,
-      data: account,
+    // Bootstrap creator as owner member
+    await AccountMember.create({
+      accountId: account._id,
+      userId: req.user.id,
+      displayName:
+        `${req.user.firstName} ${req.user.lastName}`.trim() || req.user.email,
+      role: "owner",
+      permissions: { ...ALL_PERMISSIONS },
+      invitedBy: null,
     });
+
+    return res.status(201).json({ success: true, data: account });
   } catch (error) {
     // Handle validation errors
     if (error.name === "ValidationError") {

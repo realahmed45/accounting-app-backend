@@ -25,17 +25,19 @@ const expenseSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    person: {
-      type: String,
-      required: true,
-    },
     note: {
       type: String,
       trim: true,
     },
-    fromBank: {
-      type: Boolean,
-      default: false,
+    paymentSource: {
+      type: String,
+      enum: ["cash", "bank"],
+      default: "cash",
+    },
+    bankAccountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BankAccount",
+      default: null,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,

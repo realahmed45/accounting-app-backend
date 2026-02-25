@@ -34,6 +34,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    whatsApp: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    telegram: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     isVerified: {
       type: Boolean,
       default: true, // Set to false if you want email verification

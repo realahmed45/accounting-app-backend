@@ -1,14 +1,52 @@
 import Week from "../models/Week.js";
 import Account from "../models/Account.js";
 import Expense from "../models/Expense.js";
+import BankAccount from "../models/BankAccount.js";
+
+// @desc    Add cash to box
+// @route   POST /api/weeks/:id/add-cash
+// @access  Private
+export const addCashToBox = async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: "Invalid amount" });
+    }
+
+    const week = await Week.findById(req.params.id);
+    if (!week) return res.status(404).json({ success: false, message: "Week not found" });
+
+    const account = await Account.findById(week.accountId);
+    if (account.userId.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: "Not authorized" });
+    }
+
+    if (week.isLocked) {
+      return res.status(400).json({ success: false, message: "Week is locked" });
+    }
+
+    week.cashBoxBalance += parseFloat(amount);
+    week.cashTransactions.push({
+      amount: parseFloat(amount),
+      note: note || "",
+      date: new Date(),
+      createdAt: new Date(),
+    });
+    await week.save();
+
+    res.status(200).json({ success: true, data: week });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 // @desc    Create new week
 // @route   POST /api/weeks
 // @access  Private
 export const createWeek = async (req, res) => {
   try {
-    const { accountId, startDate, endDate, bankBalance, cashBoxBalance } =
-      req.body;
+    const { accountId, startDate, endDate, cashBoxBalance } = req.body;
 
     // Verify account ownership
     const account = await Account.findById(accountId);
@@ -30,7 +68,6 @@ export const createWeek = async (req, res) => {
       accountId,
       startDate,
       endDate,
-      bankBalance: bankBalance || 0,
       cashBoxBalance: cashBoxBalance || 0,
     });
 
@@ -252,6 +289,92 @@ export const deleteWeek = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {},
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Transfer from bank account to cash
+// @route   POST /api/weeks/:id/transfer-bank-to-cash
+// @access  Private
+export const transferBankToCash = async (req, res) => {
+  try {
+    const { bankAccountId, amount } = req.body;
+
+    if (!bankAccountId || !amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Bank account ID and valid amount are required",
+      });
+    }
+
+    const week = await Week.findById(req.params.id);
+    if (!week) {
+      return res.status(404).json({
+        success: false,
+        message: "Week not found",
+      });
+    }
+
+    // Verify ownership
+    const account = await Account.findById(week.accountId);
+    if (account.userId.toString() !== req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    // Check if week is locked
+    if (week.isLocked) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot transfer in a locked week",
+      });
+    }
+
+    // Get bank account
+    const bankAccount = await BankAccount.findById(bankAccountId);
+    if (!bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: "Bank account not found",
+      });
+    }
+
+    if (bankAccount.accountId.toString() !== week.accountId.toString()) {
+      return res.status(401).json({
+        success: false,
+        message: "Bank account does not belong to this account",
+      });
+    }
+
+    // Check sufficient balance
+    if (bankAccount.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient bank account balance",
+      });
+    }
+
+    // Transfer: deduct from bank, add to cash
+    bankAccount.balance -= amount;
+    await bankAccount.save();
+
+    week.cashBoxBalance += amount;
+    await week.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        week,
+        bankAccount,
+      },
+      message: "Transfer completed successfully",
     });
   } catch (error) {
     res.status(500).json({

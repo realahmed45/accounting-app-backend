@@ -1,0 +1,4 @@
+MongoDB Connected: ac-pmvpa7t-shard-00-01.ehikyfh.mongodb.net
+Dropping database...
+Database dropped successfully.
+Disconnected from MongoDB.

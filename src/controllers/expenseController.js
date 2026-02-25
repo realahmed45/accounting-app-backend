@@ -2,6 +2,7 @@ import Expense from "../models/Expense.js";
 import Week from "../models/Week.js";
 import Account from "../models/Account.js";
 import BillPhoto from "../models/BillPhoto.js";
+import BankAccount from "../models/BankAccount.js";
 
 // @desc    Create new expense
 // @route   POST /api/expenses
@@ -14,9 +15,9 @@ export const createExpense = async (req, res) => {
       date,
       amount,
       category,
-      person,
       note,
-      fromBank,
+      paymentSource,
+      bankAccountId,
     } = req.body;
 
     // Verify account ownership
@@ -51,15 +52,56 @@ export const createExpense = async (req, res) => {
       });
     }
 
+    // Handle payment deduction
+    if (paymentSource === "bank" && bankAccountId) {
+      // Deduct from bank account
+      const bankAccount = await BankAccount.findById(bankAccountId);
+      if (!bankAccount) {
+        return res.status(404).json({
+          success: false,
+          message: "Bank account not found",
+        });
+      }
+
+      if (bankAccount.accountId.toString() !== accountId) {
+        return res.status(401).json({
+          success: false,
+          message: "Bank account does not belong to this account",
+        });
+      }
+
+      if (bankAccount.balance < amount) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient bank account balance",
+        });
+      }
+
+      // Deduct from bank account balance
+      bankAccount.balance -= amount;
+      await bankAccount.save();
+    } else {
+      // Deduct from cash box
+      if (week.cashBoxBalance < amount) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient cash balance",
+        });
+      }
+
+      week.cashBoxBalance -= amount;
+      await week.save();
+    }
+
     const expense = await Expense.create({
       accountId,
       weekId,
       date,
       amount,
       category,
-      person,
       note,
-      fromBank: fromBank || false,
+      paymentSource: paymentSource || "cash",
+      bankAccountId: paymentSource === "bank" ? bankAccountId : null,
       userId: req.user.id,
     });
 
@@ -137,7 +179,7 @@ export const getExpensesByAccount = async (req, res) => {
     }
 
     // Optional query params for filtering
-    const { startDate, endDate, category, person } = req.query;
+    const { startDate, endDate, category } = req.query;
 
     let query = { accountId: req.params.accountId };
 
@@ -147,10 +189,6 @@ export const getExpensesByAccount = async (req, res) => {
 
     if (category) {
       query.category = category;
-    }
-
-    if (person) {
-      query.person = person;
     }
 
     const expenses = await Expense.find(query).sort({ date: -1 });
@@ -288,6 +326,20 @@ export const deleteExpense = async (req, res) => {
         success: false,
         message: "Cannot delete expenses in a locked week",
       });
+    }
+
+    // Refund the amount back to the source
+    if (expense.paymentSource === "bank" && expense.bankAccountId) {
+      // Refund to bank account
+      const bankAccount = await BankAccount.findById(expense.bankAccountId);
+      if (bankAccount) {
+        bankAccount.balance += expense.amount;
+        await bankAccount.save();
+      }
+    } else {
+      // Refund to cash box
+      week.cashBoxBalance += expense.amount;
+      await week.save();
     }
 
     // Delete associated photos

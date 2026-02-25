@@ -19,14 +19,18 @@ const weekSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    bankBalance: {
-      type: Number,
-      default: 0,
-    },
     cashBoxBalance: {
       type: Number,
       default: 0,
     },
+    cashTransactions: [
+      {
+        amount: { type: Number, required: true },
+        note: { type: String, default: "" },
+        date: { type: Date, default: Date.now },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     lockedAt: {
       type: Date,
     },

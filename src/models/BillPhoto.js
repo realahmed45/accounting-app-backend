@@ -12,12 +12,8 @@ const billPhotoSchema = new mongoose.Schema(
       ref: "Account",
       required: true,
     },
-    fileUrl: {
-      type: String,
-      required: true,
-    },
-    publicId: {
-      type: String,
+    imageData: {
+      type: String, // base64 data URL (data:image/jpeg;base64,...)
       required: true,
     },
     fileName: {
