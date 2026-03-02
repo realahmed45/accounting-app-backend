@@ -269,9 +269,18 @@ export const deleteWeek = async (req, res) => {
     }
 
     // Delete all expenses associated with this week
-    await Expense.deleteMany({ weekId: req.params.id });
+    const deletedExpenses = await Expense.deleteMany({ weekId: req.params.id });
 
     await week.deleteOne();
+
+    // Log detailed deletion
+    logActivity({
+      accountId: week.accountId,
+      actorUserId: req.user.id,
+      actorDisplayName: `${req.user.firstName} ${req.user.lastName}`,
+      action: "week_deleted",
+      targetDescription: `Deleted week ${week.startDate.toLocaleDateString()} to ${week.endDate.toLocaleDateString()} along with ${deletedExpenses.deletedCount} associated expenses.`,
+    });
 
     res.status(200).json({
       success: true,

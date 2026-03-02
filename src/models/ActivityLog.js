@@ -45,6 +45,7 @@ const activityLogSchema = new mongoose.Schema(
         "shift_type_created",
         "shift_type_updated",
         "shift_checkin_submitted",
+        "shift_checkout_submitted",
         "time_off_allowance_updated",
         "time_off_extra_day_earned",
         "work_log_added",

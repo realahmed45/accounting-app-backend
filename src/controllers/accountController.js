@@ -2,6 +2,7 @@ import Account from "../models/Account.js";
 import Category from "../models/Category.js";
 import Person from "../models/Person.js";
 import AccountMember from "../models/AccountMember.js";
+import mongoose from "mongoose";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -30,19 +31,109 @@ export const createAccount = async (req, res) => {
       timezone,
     } = req.body;
 
-    // Personal account — no category required
-    if (accountType === "personal") {
-      const account = await Account.create({
-        accountName: accountName || "Personal",
-        accountType: "personal",
-        description: description || null,
-        userId: req.user.id,
-        ownerId: req.user.id,
-        currency: currency || "USD",
-        timezone: timezone || "UTC",
-      });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-      // Create default categories
+    try {
+      // Personal account — no category required
+      if (accountType === "personal") {
+        const [account] = await Account.create(
+          [
+            {
+              accountName: accountName || "Personal",
+              accountType: "personal",
+              description: description || null,
+              userId: req.user.id,
+              ownerId: req.user.id,
+              currency: currency || "USD",
+              timezone: timezone || "UTC",
+            },
+          ],
+          { session }
+        );
+
+        // Create default categories
+        const defaultCategories = [
+          "Food & Dining",
+          "Transportation",
+          "Utilities",
+          "Shopping",
+          "Entertainment",
+          "Healthcare",
+          "Other",
+        ];
+        await Category.insertMany(
+          defaultCategories.map((categoryName) => ({
+            accountId: account._id,
+            name: categoryName,
+            isDefault: true,
+          })),
+          { session }
+        );
+
+        // Bootstrap creator as owner member
+        await AccountMember.create(
+          [
+            {
+              accountId: account._id,
+              userId: req.user.id,
+              displayName:
+                `${req.user.firstName} ${req.user.lastName}`.trim() ||
+                req.user.email,
+              role: "owner",
+              permissions: { ...ALL_PERMISSIONS },
+              invitedBy: null,
+            },
+          ],
+          { session }
+        );
+
+        await session.commitTransaction();
+        session.endSession();
+        return res.status(201).json({ success: true, data: account });
+      }
+
+      // Business account — category required
+      if (!category) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: "Category is required for business accounts",
+        });
+      }
+
+      if (category === "Other" && !customDescription) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: "Custom description is required for Other category",
+        });
+      }
+
+      const [account] = await Account.create(
+        [
+          {
+            accountName:
+              accountName ||
+              (category === "Other"
+                ? customDescription
+                : subcategory || category),
+            accountType: "business",
+            category,
+            subcategory: subcategory || null,
+            customDescription: customDescription || null,
+            userId: req.user.id,
+            ownerId: req.user.id,
+            currency: currency || "USD",
+            timezone: timezone || "UTC",
+          },
+        ],
+        { session }
+      );
+
+      // Create default categories for business account
       const defaultCategories = [
         "Food & Dining",
         "Transportation",
@@ -52,91 +143,40 @@ export const createAccount = async (req, res) => {
         "Healthcare",
         "Other",
       ];
-      await Promise.all(
-        defaultCategories.map((categoryName) =>
-          Category.create({
-            accountId: account._id,
-            name: categoryName,
-            isDefault: true,
-          }),
-        ),
-      );
-
-      // Bootstrap creator as owner member
-      await AccountMember.create({
-        accountId: account._id,
-        userId: req.user.id,
-        displayName:
-          `${req.user.firstName} ${req.user.lastName}`.trim() || req.user.email,
-        role: "owner",
-        permissions: { ...ALL_PERMISSIONS },
-        invitedBy: null,
-      });
-
-      return res.status(201).json({ success: true, data: account });
-    }
-
-    // Business account — category required
-    if (!category) {
-      return res.status(400).json({
-        success: false,
-        message: "Category is required for business accounts",
-      });
-    }
-
-    if (category === "Other" && !customDescription) {
-      return res.status(400).json({
-        success: false,
-        message: "Custom description is required for Other category",
-      });
-    }
-
-    const account = await Account.create({
-      accountName:
-        accountName ||
-        (category === "Other" ? customDescription : subcategory || category),
-      accountType: "business",
-      category,
-      subcategory: subcategory || null,
-      customDescription: customDescription || null,
-      userId: req.user.id,
-      ownerId: req.user.id,
-      currency: currency || "USD",
-      timezone: timezone || "UTC",
-    });
-
-    // Create default categories for business account
-    const defaultCategories = [
-      "Food & Dining",
-      "Transportation",
-      "Utilities",
-      "Shopping",
-      "Entertainment",
-      "Healthcare",
-      "Other",
-    ];
-    await Promise.all(
-      defaultCategories.map((categoryName) =>
-        Category.create({
+      await Category.insertMany(
+        defaultCategories.map((categoryName) => ({
           accountId: account._id,
           name: categoryName,
           isDefault: true,
-        }),
-      ),
-    );
+        })),
+        { session }
+      );
 
-    // Bootstrap creator as owner member
-    await AccountMember.create({
-      accountId: account._id,
-      userId: req.user.id,
-      displayName:
-        `${req.user.firstName} ${req.user.lastName}`.trim() || req.user.email,
-      role: "owner",
-      permissions: { ...ALL_PERMISSIONS },
-      invitedBy: null,
-    });
+      // Bootstrap creator as owner member
+      await AccountMember.create(
+        [
+          {
+            accountId: account._id,
+            userId: req.user.id,
+            displayName:
+              `${req.user.firstName} ${req.user.lastName}`.trim() ||
+              req.user.email,
+            role: "owner",
+            permissions: { ...ALL_PERMISSIONS },
+            invitedBy: null,
+          },
+        ],
+        { session }
+      );
 
-    return res.status(201).json({ success: true, data: account });
+      await session.commitTransaction();
+      session.endSession();
+      return res.status(201).json({ success: true, data: account });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   } catch (error) {
     // Handle validation errors
     if (error.name === "ValidationError") {

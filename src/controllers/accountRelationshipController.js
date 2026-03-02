@@ -2,6 +2,7 @@ import AccountRelationship from "../models/AccountRelationship.js";
 import Account from "../models/Account.js";
 import AccountMember from "../models/AccountMember.js";
 import Category from "../models/Category.js";
+import mongoose from "mongoose";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -102,60 +103,90 @@ export const createDownwardAccount = async (req, res) => {
         });
     }
 
-    // Create the child account
-    const childAccount = await Account.create({
-      accountName: accountName || "Sub Account",
-      accountType: accountType || "business",
-      category: category || null,
-      subcategory: subcategory || null,
-      customDescription: customDescription || null,
-      description: description || null,
-      userId: req.user.id,
-      ownerId: req.user.id,
-      parentAccountId: req.params.id,
-      currency: currency || parentAccount.currency || "USD",
-      timezone: timezone || parentAccount.timezone || "UTC",
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Create default categories
-    const defaultCategories = [
-      "Food & Dining",
-      "Transportation",
-      "Utilities",
-      "Shopping",
-      "Entertainment",
-      "Healthcare",
-      "Other",
-    ];
-    await Promise.all(
-      defaultCategories.map((name) =>
-        Category.create({ accountId: childAccount._id, name, isDefault: true }),
-      ),
-    );
+    try {
+      // Create the child account
+      const [childAccount] = await Account.create(
+        [
+          {
+            accountName: accountName || "Sub Account",
+            accountType: accountType || "business",
+            category: category || null,
+            subcategory: subcategory || null,
+            customDescription: customDescription || null,
+            description: description || null,
+            userId: req.user.id,
+            ownerId: req.user.id,
+            parentAccountId: req.params.id,
+            currency: currency || parentAccount.currency || "USD",
+            timezone: timezone || parentAccount.timezone || "UTC",
+          },
+        ],
+        { session }
+      );
 
-    // Create owner AccountMember for caller on child account
-    await AccountMember.create({
-      accountId: childAccount._id,
-      userId: req.user.id,
-      displayName: `${req.user.firstName} ${req.user.lastName}`,
-      role: "owner",
-      permissions: { ...ALL_PERMISSIONS },
-      invitedBy: null,
-    });
+      // Create default categories
+      const defaultCategories = [
+        "Food & Dining",
+        "Transportation",
+        "Utilities",
+        "Shopping",
+        "Entertainment",
+        "Healthcare",
+        "Other",
+      ];
+      await Category.insertMany(
+        defaultCategories.map((name) => ({
+          accountId: childAccount._id,
+          name,
+          isDefault: true,
+        })),
+        { session }
+      );
 
-    // Create the relationship record
-    const relationship = await AccountRelationship.create({
-      parentAccountId: req.params.id,
-      childAccountId: childAccount._id,
-      relationshipType: "downward",
-      accessLevel: accessLevel || "full",
-      createdBy: req.user.id,
-    });
+      // Create owner AccountMember for caller on child account
+      await AccountMember.create(
+        [
+          {
+            accountId: childAccount._id,
+            userId: req.user.id,
+            displayName: `${req.user.firstName} ${req.user.lastName}`,
+            role: "owner",
+            permissions: { ...ALL_PERMISSIONS },
+            invitedBy: null,
+          },
+        ],
+        { session }
+      );
 
-    res.status(201).json({
-      success: true,
-      data: { account: childAccount, relationship },
-    });
+      // Create the relationship record
+      const [relationship] = await AccountRelationship.create(
+        [
+          {
+            parentAccountId: req.params.id,
+            childAccountId: childAccount._id,
+            relationshipType: "downward",
+            accessLevel: accessLevel || "full",
+            createdBy: req.user.id,
+          },
+        ],
+        { session }
+      );
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(201).json({
+        success: true,
+        data: { account: childAccount, relationship },
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   } catch (error) {
     if (error.code === 11000) {
       return res

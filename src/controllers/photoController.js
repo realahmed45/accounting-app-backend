@@ -23,12 +23,12 @@ export const uploadBillPhoto = async (req, res) => {
       });
     }
 
-    // Verify ownership
-    const account = await Account.findById(expense.accountId);
-    if (account.userId.toString() !== req.user.id) {
+    // Verify ownership and permission
+    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
+    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
       return res.status(401).json({
         success: false,
-        message: "Not authorized",
+        message: "Not authorized to upload photos for this account",
       });
     }
 

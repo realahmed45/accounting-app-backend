@@ -4,9 +4,11 @@ import * as shiftTypeController from "../controllers/shiftTypeController.js";
 import * as shiftController from "../controllers/shiftController.js";
 import * as extraHourController from "../controllers/extraHourController.js";
 import * as shiftCheckInController from "../controllers/shiftCheckInController.js";
+import * as shiftCheckOutController from "../controllers/shiftCheckOutController.js";
 import * as timeOffController from "../controllers/timeOffController.js";
 import * as workLogController from "../controllers/workLogController.js";
 import * as reportController from "../controllers/scheduleReportController.js";
+import { validateImageSize } from "../middleware/imageValidation.js";
 
 const router = express.Router();
 
@@ -39,13 +41,18 @@ router.post("/:id/schedule/shifts/:shiftId/assign", requirePermission("manageSch
 
 // Check-In
 router.route("/:id/schedule/shifts/:shiftId/checkin")
-  .post(shiftCheckInController.submit)
+  .post(validateImageSize(5), shiftCheckInController.submit)
   .get(shiftCheckInController.get);
+
+// Check-Out
+router.route("/:id/schedule/shifts/:shiftId/checkout")
+  .post(validateImageSize(5), shiftCheckOutController.submit)
+  .get(shiftCheckOutController.get);
 
 // Extra Hours
 router.route("/:id/schedule/extra-hours")
   .get(extraHourController.getAll)
-  .post(extraHourController.submit);
+  .post(validateImageSize(5), extraHourController.submit);
 
 router.put("/:id/schedule/extra-hours/:ehId/review", requirePermission("manageSchedule"), extraHourController.review);
 

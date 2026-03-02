@@ -3,6 +3,7 @@ import Week from "../models/Week.js";
 import AccountMember from "../models/AccountMember.js";
 import BillPhoto from "../models/BillPhoto.js";
 import BankAccount from "../models/BankAccount.js";
+import { logActivity } from "../utils/activityLogger.js";
 
 // @desc    Create new expense
 // @route   POST /api/expenses
@@ -108,6 +109,15 @@ export const createExpense = async (req, res) => {
     res.status(201).json({
       success: true,
       data: expense,
+    });
+
+    logActivity({
+      accountId: accountId.toString(),
+      actorUserId: req.user.id.toString(),
+      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      action: "expense_created",
+      targetDescription: `Created ${paymentSource} expense: ${amount} ${category}`,
+      metadata: { expenseId: expense._id, amount, category, paymentSource },
     });
   } catch (error) {
     res.status(500).json({
@@ -281,6 +291,15 @@ export const updateExpense = async (req, res) => {
       success: true,
       data: expense,
     });
+
+    logActivity({
+      accountId: expense.accountId.toString(),
+      actorUserId: req.user.id.toString(),
+      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      action: "expense_updated",
+      targetDescription: `Updated expense: ${expense.amount} ${expense.category}`,
+      metadata: { expenseId: expense._id, amount: expense.amount, category: expense.category },
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -343,6 +362,15 @@ export const deleteExpense = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {},
+    });
+
+    logActivity({
+      accountId: expense.accountId.toString(),
+      actorUserId: req.user.id.toString(),
+      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      action: "expense_deleted",
+      targetDescription: `Deleted expense: ${expense.amount} ${expense.category}`,
+      metadata: { expenseId: expense._id, amount: expense.amount, category: expense.category },
     });
   } catch (error) {
     res.status(500).json({

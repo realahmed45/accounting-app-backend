@@ -56,6 +56,18 @@ export const requestOwnershipCorrection = async (req, res) => {
       });
     }
 
+    // Enforce 4-day (96 hours) deadline for corrections
+    if (transferRequest.status === "accepted") {
+      const acceptedAt = transferRequest.updatedAt; // status changed to accepted at this time
+      const hoursSinceAcceptance = (new Date() - new Date(acceptedAt)) / (1000 * 60 * 60);
+      if (hoursSinceAcceptance > 96) {
+        return res.status(400).json({
+          success: false,
+          message: "The 4-day correction window for this transfer has expired.",
+        });
+      }
+    }
+
     if (transferRequest.status === "correctionRequested") {
       return res.status(400).json({
         success: false,

@@ -334,6 +334,13 @@ export const transferOwnership = async (req, res) => {
         .json({ success: false, message: "toEmail is required" });
     }
 
+    if (!toWhatsApp || !toTelegram) {
+      return res.status(400).json({
+        success: false,
+        message: "WhatsApp and Telegram handles are required for ownership transfer verification",
+      });
+    }
+
     const normalizedEmail = toEmail.toLowerCase().trim();
 
     const account = await findAccount(req.params.id);

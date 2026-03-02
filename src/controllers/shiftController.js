@@ -2,6 +2,8 @@ import Shift from "../models/Shift.js";
 import ShiftType from "../models/ShiftType.js";
 import ActivityLog from "../models/ActivityLog.js";
 import AccountMember from "../models/AccountMember.js";
+import ShiftCheckIn from "../models/ShiftCheckIn.js";
+import ShiftCheckOut from "../models/ShiftCheckOut.js";
 
 // Helper to check for overlapping shifts
 const hasOverlap = async (accountId, memberId, date, startTime, endTime, excludeShiftId = null) => {
@@ -91,9 +93,27 @@ export const getMine = async (req, res) => {
       .populate("shiftTypeId")
       .sort({ date: 1 });
 
+    // Fetch check-in/out status for these shifts
+    const shiftIds = shifts.map((s) => s._id);
+    const [checkIns, checkOuts] = await Promise.all([
+      ShiftCheckIn.find({ shiftId: { $in: shiftIds } }),
+      ShiftCheckOut.find({ shiftId: { $in: shiftIds } }),
+    ]);
+
+    const enrichedShifts = shifts.map((shift) => {
+      const shiftObj = shift.toObject();
+      shiftObj.hasCheckedIn = !!checkIns.find(
+        (ci) => ci.shiftId.toString() === shift._id.toString()
+      );
+      shiftObj.hasCheckedOut = !!checkOuts.find(
+        (co) => co.shiftId.toString() === shift._id.toString()
+      );
+      return shiftObj;
+    });
+
     res.status(200).json({
       success: true,
-      data: shifts,
+      data: enrichedShifts,
     });
   } catch (error) {
     res.status(500).json({
