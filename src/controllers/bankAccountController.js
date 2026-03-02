@@ -1,9 +1,11 @@
 import AccountMember from "../models/AccountMember.js";
+import BankAccount from "../models/BankAccount.js";
 
 // Helper – verify account membership and return member record
 const verifyAccountMembership = async (accountId, userId) => {
   const member = await AccountMember.findOne({ accountId, userId });
-  if (!member) return { error: "Not authorized to access this account", status: 403 };
+  if (!member)
+    return { error: "Not authorized to access this account", status: 403 };
   return { member };
 };
 
@@ -47,7 +49,12 @@ export const createBankAccount = async (req, res) => {
       return res.status(status).json({ success: false, message: error });
 
     if (member.role !== "owner" && !member.permissions.addBankAccount) {
-      return res.status(403).json({ success: false, message: "No permission to add bank accounts" });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "No permission to add bank accounts",
+        });
     }
 
     const { name, bankName, accountType, lastFourDigits, balance, currency } =
