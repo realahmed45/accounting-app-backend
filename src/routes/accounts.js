@@ -72,7 +72,7 @@ router
 
 router
   .route("/:id/bank-accounts/:bankId/adjust")
-  .post(protect, requirePermission("calculateCash"), adjustBalance);
+  .post(protect, requirePermission("updateBankBalance"), adjustBalance);
 
 // Member management routes
 router

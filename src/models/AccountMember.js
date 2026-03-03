@@ -7,6 +7,7 @@ const permissionsSchema = new mongoose.Schema(
     addUser: { type: Boolean, default: false },
     addCategories: { type: Boolean, default: false },
     addBankAccount: { type: Boolean, default: false },
+    updateBankBalance: { type: Boolean, default: false },
     makeExpense: { type: Boolean, default: true },
     createAccountDownward: { type: Boolean, default: false },
     createAccountUpward: { type: Boolean, default: false },
