@@ -2,6 +2,8 @@ import Week from "../models/Week.js";
 import AccountMember from "../models/AccountMember.js";
 import Expense from "../models/Expense.js";
 import BankAccount from "../models/BankAccount.js";
+import ActivityLog from "../models/ActivityLog.js";
+import User from "../models/User.js";
 
 // @desc    Add cash to box
 // @route   POST /api/weeks/:id/add-cash
@@ -34,6 +36,18 @@ export const addCashToBox = async (req, res) => {
       createdAt: new Date(),
     });
     await week.save();
+
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: week.accountId,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "week_created",
+      targetDescription: `Added $${amount.toFixed(2)} to cash box${note ? `: ${note}` : ""}`,
+      metadata: { weekId: week._id, amount, note },
+    });
 
     res.status(200).json({ success: true, data: week });
   } catch (error) {
@@ -226,6 +240,18 @@ export const lockWeek = async (req, res) => {
     week.lockedAt = new Date();
     await week.save();
 
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: week.accountId,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "week_locked",
+      targetDescription: `Locked week ${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
+      metadata: { weekId: week._id },
+    });
+
     res.status(200).json({
       success: true,
       data: week,
@@ -362,6 +388,18 @@ export const transferBankToCash = async (req, res) => {
 
     week.cashBoxBalance += amount;
     await week.save();
+
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: week.accountId,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "week_created",
+      targetDescription: `Transferred $${amount.toFixed(2)} from ${bankAccount.name} to cash box`,
+      metadata: { weekId: week._id, bankAccountId: bankAccount._id, amount },
+    });
 
     res.status(200).json({
       success: true,

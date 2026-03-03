@@ -1,5 +1,7 @@
 import AccountMember from "../models/AccountMember.js";
 import BankAccount from "../models/BankAccount.js";
+import ActivityLog from "../models/ActivityLog.js";
+import User from "../models/User.js";
 
 // Helper – verify account membership and return member record
 const verifyAccountMembership = async (accountId, userId) => {
@@ -71,6 +73,18 @@ export const createBankAccount = async (req, res) => {
       currency: currency || "USD",
     });
 
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: req.params.id,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "bank_account_added",
+      targetDescription: `Added bank account: ${name} (${bankName})`,
+      metadata: { bankAccountId: bankAccount._id, initialBalance: balance },
+    });
+
     res.status(201).json({ success: true, data: bankAccount });
   } catch (err) {
     if (err.name === "ValidationError") {
@@ -107,6 +121,18 @@ export const updateBankAccount = async (req, res) => {
         .json({ success: false, message: "Bank account not found" });
     }
 
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: req.params.id,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "account_settings_changed",
+      targetDescription: `Updated bank account: ${bankAccount.name}`,
+      metadata: { bankAccountId: bankAccount._id },
+    });
+
     res.status(200).json({ success: true, data: bankAccount });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -137,8 +163,90 @@ export const deleteBankAccount = async (req, res) => {
         .json({ success: false, message: "Bank account not found" });
     }
 
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: req.params.id,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "bank_account_removed",
+      targetDescription: `Removed bank account: ${bankAccount.name}`,
+      metadata: { bankAccountId: bankAccount._id },
+    });
+
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// @desc    Adjust bank account balance
+// @route   POST /api/accounts/:id/bank-accounts/:bankId/adjust
+// @access  Private
+export const adjustBalance = async (req, res) => {
+  try {
+    const { error, status, member } = await verifyAccountMembership(
+      req.params.id,
+      req.user.id,
+    );
+    if (error)
+      return res.status(status).json({ success: false, message: error });
+
+    if (member.role !== "owner" && !member.permissions.calculateCash) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "No permission to adjust bank balances",
+        });
+    }
+
+    const bankAccount = await BankAccount.findOne({
+      _id: req.params.bankId,
+      accountId: req.params.id,
+    });
+
+    if (!bankAccount) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Bank account not found" });
+    }
+
+    const { newBalance, reason } = req.body;
+
+    if (typeof newBalance !== "number" || newBalance < 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid balance amount" });
+    }
+
+    const oldBalance = bankAccount.balance;
+    const difference = newBalance - oldBalance;
+    bankAccount.balance = newBalance;
+    await bankAccount.save();
+
+    // Log activity
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    await ActivityLog.create({
+      accountId: req.params.id,
+      actorUserId: req.user.id,
+      actorDisplayName: displayName,
+      action: "account_settings_changed",
+      targetDescription: `Adjusted ${bankAccount.name} balance from $${oldBalance.toFixed(2)} to $${newBalance.toFixed(2)} (${difference >= 0 ? "+" : ""}$${difference.toFixed(2)})${reason ? `: ${reason}` : ""}`,
+      metadata: {
+        bankAccountId: bankAccount._id,
+        oldBalance,
+        newBalance,
+        difference,
+        reason,
+      },
+    });
+
+    res.status(200).json({ success: true, data: bankAccount });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

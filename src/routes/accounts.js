@@ -15,6 +15,7 @@ import {
   createBankAccount,
   updateBankAccount,
   deleteBankAccount,
+  adjustBalance,
 } from "../controllers/bankAccountController.js";
 import {
   getMembers,
@@ -68,6 +69,10 @@ router
   .route("/:id/bank-accounts/:bankId")
   .put(protect, requirePermission("addBankAccount"), updateBankAccount)
   .delete(protect, requirePermission("addBankAccount"), deleteBankAccount);
+
+router
+  .route("/:id/bank-accounts/:bankId/adjust")
+  .post(protect, requirePermission("calculateCash"), adjustBalance);
 
 // Member management routes
 router
