@@ -2,6 +2,7 @@ import AccountMember from "../models/AccountMember.js";
 import BankAccount from "../models/BankAccount.js";
 import ActivityLog from "../models/ActivityLog.js";
 import User from "../models/User.js";
+import Account from "../models/Account.js";
 
 // Helper – verify account membership and return member record
 const verifyAccountMembership = async (accountId, userId) => {
@@ -60,6 +61,29 @@ export const createBankAccount = async (req, res) => {
     const { name, bankName, accountType, lastFourDigits, balance, currency } =
       req.body;
 
+    // Get the account to check if this is first bank and enforce currency
+    const account = await Account.findById(req.params.id);
+    if (!account) {
+      return res.status(404).json({ success: false, message: "Account not found" });
+    }
+
+    // Check existing bank accounts
+    const existingBanks = await BankAccount.find({
+      accountId: req.params.id,
+      isActive: true,
+    });
+
+    let finalCurrency = currency || "USD";
+
+    if (existingBanks.length === 0) {
+      // First bank account - set account currency
+      account.currency = finalCurrency;
+      await account.save();
+    } else {
+      // Enforce account currency for subsequent banks
+      finalCurrency = account.currency || "USD";
+    }
+
     const bankAccount = await BankAccount.create({
       accountId: req.params.id,
       userId: req.user.id,
@@ -68,7 +92,7 @@ export const createBankAccount = async (req, res) => {
       accountType: accountType || "checking",
       lastFourDigits: lastFourDigits || "",
       balance: balance || 0,
-      currency: currency || "USD",
+      currency: finalCurrency,
     });
 
     // Log activity
