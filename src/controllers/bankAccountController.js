@@ -51,12 +51,10 @@ export const createBankAccount = async (req, res) => {
       return res.status(status).json({ success: false, message: error });
 
     if (member.role !== "owner" && !member.permissions.addBankAccount) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "No permission to add bank accounts",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "No permission to add bank accounts",
+      });
     }
 
     const { name, bankName, accountType, lastFourDigits, balance, currency } =
@@ -194,12 +192,10 @@ export const adjustBalance = async (req, res) => {
       return res.status(status).json({ success: false, message: error });
 
     if (member.role !== "owner" && !member.permissions.calculateCash) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "No permission to adjust bank balances",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "No permission to adjust bank balances",
+      });
     }
 
     const bankAccount = await BankAccount.findOne({
@@ -249,4 +245,3 @@ export const adjustBalance = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-

@@ -13,19 +13,31 @@ export const addCashToBox = async (req, res) => {
     const { amount, note } = req.body;
 
     if (!amount || amount <= 0) {
-      return res.status(400).json({ success: false, message: "Invalid amount" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid amount" });
     }
 
     const week = await Week.findById(req.params.id);
-    if (!week) return res.status(404).json({ success: false, message: "Week not found" });
+    if (!week)
+      return res
+        .status(404)
+        .json({ success: false, message: "Week not found" });
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
     if (!member) {
-      return res.status(401).json({ success: false, message: "Not a member of this account" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Not a member of this account" });
     }
 
     if (week.isLocked) {
-      return res.status(400).json({ success: false, message: "Week is locked" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Week is locked" });
     }
 
     week.cashBoxBalance += parseFloat(amount);
@@ -62,7 +74,10 @@ export const createWeek = async (req, res) => {
   try {
     const { accountId, startDate, endDate, cashBoxBalance } = req.body;
 
-    const member = await AccountMember.findOne({ accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -101,7 +116,10 @@ export const createWeek = async (req, res) => {
 // @access  Private
 export const getWeeksByAccount = async (req, res) => {
   try {
-    const member = await AccountMember.findOne({ accountId: req.params.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: req.params.accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -140,7 +158,10 @@ export const getWeek = async (req, res) => {
       });
     }
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -174,8 +195,14 @@ export const updateWeek = async (req, res) => {
       });
     }
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.calculateCash)
+    ) {
       return res.status(403).json({
         success: false,
         message: "No permission to update weeks",
@@ -221,8 +248,14 @@ export const lockWeek = async (req, res) => {
       });
     }
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.calculateCash)
+    ) {
       return res.status(403).json({
         success: false,
         message: "No permission to lock weeks",
@@ -278,7 +311,10 @@ export const deleteWeek = async (req, res) => {
       });
     }
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
     if (!member || member.role !== "owner") {
       return res.status(403).json({
         success: false,
@@ -342,8 +378,14 @@ export const transferBankToCash = async (req, res) => {
       });
     }
 
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.calculateCash)) {
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.calculateCash)
+    ) {
       return res.status(403).json({
         success: false,
         message: "No permission to transfer funds",
