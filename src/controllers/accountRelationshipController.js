@@ -95,12 +95,10 @@ export const createDownwardAccount = async (req, res) => {
         .json({ success: false, message: "Not a member of this account" });
     }
     if (caller.role !== "owner" && !caller.permissions.createAccountDownward) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You don't have permission to create sub-accounts",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to create sub-accounts",
+      });
     }
 
     const session = await mongoose.startSession();
@@ -120,11 +118,11 @@ export const createDownwardAccount = async (req, res) => {
             userId: req.user.id,
             ownerId: req.user.id,
             parentAccountId: req.params.id,
-            currency: currency || parentAccount.currency || "USD",
+            currency: currency || parentAccount.currency || null,
             timezone: timezone || parentAccount.timezone || "UTC",
           },
         ],
-        { session }
+        { session },
       );
 
       // Create default categories
@@ -143,7 +141,7 @@ export const createDownwardAccount = async (req, res) => {
           name,
           isDefault: true,
         })),
-        { session }
+        { session },
       );
 
       // Create owner AccountMember for caller on child account
@@ -158,7 +156,7 @@ export const createDownwardAccount = async (req, res) => {
             invitedBy: null,
           },
         ],
-        { session }
+        { session },
       );
 
       // Create the relationship record
@@ -172,7 +170,7 @@ export const createDownwardAccount = async (req, res) => {
             createdBy: req.user.id,
           },
         ],
-        { session }
+        { session },
       );
 
       await session.commitTransaction();
@@ -238,12 +236,10 @@ export const linkUpwardAccount = async (req, res) => {
       callerOnChild.role !== "owner" &&
       !callerOnChild.permissions.createAccountUpward
     ) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You don't have permission to link to a parent account",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to link to a parent account",
+      });
     }
 
     // Caller must also be a member of the parent
@@ -252,12 +248,10 @@ export const linkUpwardAccount = async (req, res) => {
       userId: req.user.id,
     });
     if (!callerOnParent) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You must be a member of the parent account to link to it",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You must be a member of the parent account to link to it",
+      });
     }
 
     // Update child account's parentAccountId
@@ -316,13 +310,11 @@ export const linkSidewaysAccount = async (req, res) => {
     ]);
 
     if (!callerSource || !callerTarget) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message:
-            "You must be a member of both accounts to create a sideways link",
-        });
+      return res.status(403).json({
+        success: false,
+        message:
+          "You must be a member of both accounts to create a sideways link",
+      });
     }
 
     const relationship = await AccountRelationship.create({
@@ -362,12 +354,10 @@ export const removeRelationship = async (req, res) => {
       userId: req.user.id,
     });
     if (!caller || caller.role !== "owner") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Only the account owner can remove relationships",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Only the account owner can remove relationships",
+      });
     }
 
     await relationship.deleteOne();

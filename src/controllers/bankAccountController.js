@@ -75,15 +75,28 @@ export const createBankAccount = async (req, res) => {
       isActive: true,
     });
 
-    let finalCurrency = currency || "USD";
+    let finalCurrency;
 
     if (existingBanks.length === 0) {
-      // First bank account - set account currency
+      // First bank account - currency is required and sets account currency
+      if (!currency) {
+        return res.status(400).json({
+          success: false,
+          message: "Currency is required for the first bank account",
+        });
+      }
+      finalCurrency = currency;
       account.currency = finalCurrency;
       await account.save();
     } else {
       // Enforce account currency for subsequent banks
-      finalCurrency = account.currency || "USD";
+      finalCurrency = account.currency;
+      if (!finalCurrency) {
+        return res.status(400).json({
+          success: false,
+          message: "Account currency not set. Please contact support.",
+        });
+      }
     }
 
     const bankAccount = await BankAccount.create({

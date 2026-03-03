@@ -37,7 +37,7 @@ const bankAccountSchema = new mongoose.Schema(
     },
     currency: {
       type: String,
-      default: "USD",
+      required: true,
       trim: true,
     },
     isActive: {

@@ -45,11 +45,11 @@ export const createAccount = async (req, res) => {
               description: description || null,
               userId: req.user.id,
               ownerId: req.user.id,
-              currency: currency || "USD",
+              currency: null,
               timezone: timezone || "UTC",
             },
           ],
-          { session }
+          { session },
         );
 
         // Create default categories
@@ -68,7 +68,7 @@ export const createAccount = async (req, res) => {
             name: categoryName,
             isDefault: true,
           })),
-          { session }
+          { session },
         );
 
         // Bootstrap creator as owner member
@@ -85,7 +85,7 @@ export const createAccount = async (req, res) => {
               invitedBy: null,
             },
           ],
-          { session }
+          { session },
         );
 
         await session.commitTransaction();
@@ -126,11 +126,11 @@ export const createAccount = async (req, res) => {
             customDescription: customDescription || null,
             userId: req.user.id,
             ownerId: req.user.id,
-            currency: currency || "USD",
+            currency: null,
             timezone: timezone || "UTC",
           },
         ],
-        { session }
+        { session },
       );
 
       // Create default categories for business account
@@ -149,7 +149,7 @@ export const createAccount = async (req, res) => {
           name: categoryName,
           isDefault: true,
         })),
-        { session }
+        { session },
       );
 
       // Bootstrap creator as owner member
@@ -166,7 +166,7 @@ export const createAccount = async (req, res) => {
             invitedBy: null,
           },
         ],
-        { session }
+        { session },
       );
 
       await session.commitTransaction();
@@ -409,7 +409,10 @@ export const createCategory = async (req, res) => {
       userId: req.user.id,
     });
 
-    if (!member || (member.role !== "owner" && !member.permissions.addCategories)) {
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.addCategories)
+    ) {
       return res.status(403).json({
         success: false,
         message: "You don't have permission to add categories",
