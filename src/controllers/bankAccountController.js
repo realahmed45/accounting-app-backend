@@ -64,7 +64,9 @@ export const createBankAccount = async (req, res) => {
     // Get the account to check if this is first bank and enforce currency
     const account = await Account.findById(req.params.id);
     if (!account) {
-      return res.status(404).json({ success: false, message: "Account not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Account not found" });
     }
 
     // Check existing bank accounts
