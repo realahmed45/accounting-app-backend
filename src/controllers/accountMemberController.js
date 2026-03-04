@@ -164,7 +164,8 @@ export const addMember = async (req, res) => {
       viewOnly,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${token}`;
     const inviterName =
       `${req.user.firstName || ""} ${req.user.familyName || req.user.lastName || ""}`.trim() ||
@@ -326,22 +327,56 @@ export const removeMember = async (req, res) => {
 // @access  Private — current owner only
 export const transferOwnership = async (req, res) => {
   try {
-    const { toEmail, toWhatsApp, toTelegram } = req.body;
+    const { toEmail, targetAccountUniqueId, toWhatsApp, toTelegram } = req.body;
 
-    if (!toEmail) {
-      return res
-        .status(400)
-        .json({ success: false, message: "toEmail is required" });
+    // Accept either toEmail (legacy) or targetAccountUniqueId (new method)
+    if (!toEmail && !targetAccountUniqueId) {
+      return res.status(400).json({
+        success: false,
+        message: "Either toEmail or targetAccountUniqueId is required",
+      });
     }
 
     if (!toWhatsApp || !toTelegram) {
       return res.status(400).json({
         success: false,
-        message: "WhatsApp and Telegram handles are required for ownership transfer verification",
+        message:
+          "WhatsApp and Telegram handles are required for ownership transfer verification",
       });
     }
 
-    const normalizedEmail = toEmail.toLowerCase().trim();
+    let normalizedEmail;
+
+    // If unique ID is provided, find the target account's owner
+    if (targetAccountUniqueId) {
+      const targetAccount = await Account.findOne({
+        uniqueId: targetAccountUniqueId.toUpperCase().trim(),
+      });
+
+      if (!targetAccount) {
+        return res.status(404).json({
+          success: false,
+          message: "Account with this unique ID not found",
+        });
+      }
+
+      // Find the owner of the target account
+      const targetOwnerMember = await AccountMember.findOne({
+        accountId: targetAccount._id,
+        role: "owner",
+      }).populate("userId");
+
+      if (!targetOwnerMember || !targetOwnerMember.userId) {
+        return res.status(404).json({
+          success: false,
+          message: "Could not find owner of target account",
+        });
+      }
+
+      normalizedEmail = targetOwnerMember.userId.email.toLowerCase().trim();
+    } else {
+      normalizedEmail = toEmail.toLowerCase().trim();
+    }
 
     const account = await findAccount(req.params.id);
     if (!account) {
@@ -359,12 +394,10 @@ export const transferOwnership = async (req, res) => {
     }
 
     if (normalizedEmail === req.user.email) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "You cannot transfer ownership to yourself",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "You cannot transfer ownership to yourself",
+      });
     }
 
     // Block if there's already a pending transfer
@@ -407,7 +440,8 @@ export const transferOwnership = async (req, res) => {
       expiresAt,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${token}`;
     const inviterName =
       `${req.user.firstName || ""} ${req.user.familyName || req.user.lastName || ""}`.trim() ||

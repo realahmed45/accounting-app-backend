@@ -3,6 +3,10 @@ import Category from "../models/Category.js";
 import Person from "../models/Person.js";
 import AccountMember from "../models/AccountMember.js";
 import mongoose from "mongoose";
+import {
+  generateAccountUniqueId,
+  validateUniqueIdFormat,
+} from "../utils/generateUniqueId.js";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -37,6 +41,9 @@ export const createAccount = async (req, res) => {
     try {
       // Personal account — no category required
       if (accountType === "personal") {
+        // Generate unique ID for this account
+        const uniqueId = await generateAccountUniqueId();
+
         const [account] = await Account.create(
           [
             {
@@ -45,6 +52,7 @@ export const createAccount = async (req, res) => {
               description: description || null,
               userId: req.user.id,
               ownerId: req.user.id,
+              uniqueId,
               currency: null,
               timezone: timezone || "UTC",
             },
@@ -112,6 +120,9 @@ export const createAccount = async (req, res) => {
         });
       }
 
+      // Generate unique ID for business account
+      const uniqueId = await generateAccountUniqueId();
+
       const [account] = await Account.create(
         [
           {
@@ -126,6 +137,7 @@ export const createAccount = async (req, res) => {
             customDescription: customDescription || null,
             userId: req.user.id,
             ownerId: req.user.id,
+            uniqueId,
             currency: null,
             timezone: timezone || "UTC",
           },
@@ -517,6 +529,143 @@ export const createPerson = async (req, res) => {
     res.status(201).json({
       success: true,
       data: person,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Find account by unique ID
+// @route   GET /api/accounts/by-unique-id/:uniqueId
+// @access  Private
+export const findAccountByUniqueId = async (req, res) => {
+  try {
+    const { uniqueId } = req.params;
+
+    // Validate format
+    if (!validateUniqueIdFormat(uniqueId.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid unique ID format. Expected format: ACC-XXXXXX",
+      });
+    }
+
+    // Find account
+    const account = await Account.findOne({
+      uniqueId: uniqueId.toUpperCase(),
+    }).select("uniqueId accountName accountType");
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found with this unique ID",
+      });
+    }
+
+    // Return limited info for security (don't expose full account details)
+    res.json({
+      success: true,
+      data: {
+        uniqueId: account.uniqueId,
+        accountName: account.accountName,
+        accountType: account.accountType,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Link current account to a parent account
+// @route   POST /api/accounts/:accountId/link-parent
+// @access  Private
+export const linkToParent = async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { parentUniqueId } = req.body;
+
+    if (!parentUniqueId) {
+      return res.status(400).json({
+        success: false,
+        message: "Parent account unique ID is required",
+      });
+    }
+
+    // Validate format
+    if (!validateUniqueIdFormat(parentUniqueId.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid parent unique ID format. Expected: ACC-XXXXXX",
+      });
+    }
+
+    // Check if user is owner or has accessSettings permission
+    const member = await AccountMember.findOne({
+      accountId,
+      userId: req.user.id,
+    });
+
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.accessSettings)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to link this account to a parent",
+      });
+    }
+
+    // Find parent account
+    const parentAccount = await Account.findOne({
+      uniqueId: parentUniqueId.toUpperCase(),
+    });
+
+    if (!parentAccount) {
+      return res.status(404).json({
+        success: false,
+        message: "Parent account not found with this unique ID",
+      });
+    }
+
+    // Prevent linking account to itself
+    if (parentAccount._id.toString() === accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot link account to itself",
+      });
+    }
+
+    // Check for circular reference
+    // Prevent child from becoming parent's parent
+    let checkAccount = parentAccount;
+    while (checkAccount.parentAccountId) {
+      if (checkAccount.parentAccountId.toString() === accountId) {
+        return res.status(400).json({
+          success: false,
+          message: "Circular parent-child relationship detected",
+        });
+      }
+      checkAccount = await Account.findById(checkAccount.parentAccountId);
+      if (!checkAccount) break;
+    }
+
+    // Update account with parent
+    const account = await Account.findByIdAndUpdate(
+      accountId,
+      { parentAccountId: parentAccount._id },
+      { new: true },
+    ).populate("parentAccountId", "accountName uniqueId accountType");
+
+    res.json({
+      success: true,
+      message: `Account successfully linked to ${parentAccount.accountName}`,
+      data: account,
     });
   } catch (error) {
     res.status(500).json({

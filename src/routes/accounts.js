@@ -9,6 +9,8 @@ import {
   createCategory,
   getPeople,
   createPerson,
+  findAccountByUniqueId,
+  linkToParent,
 } from "../controllers/accountController.js";
 import {
   getBankAccounts,
@@ -45,6 +47,9 @@ import { protect, requirePermission } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Find account by unique ID
+router.get("/by-unique-id/:uniqueId", protect, findAccountByUniqueId);
+
 router.route("/").get(protect, getAccounts).post(protect, createAccount);
 
 router
@@ -52,6 +57,9 @@ router
   .get(protect, getAccount)
   .put(protect, updateAccount)
   .delete(protect, deleteAccount);
+
+// Link account to parent
+router.post("/:accountId/link-parent", protect, linkToParent);
 
 router
   .route("/:id/categories")

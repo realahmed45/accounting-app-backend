@@ -39,6 +39,15 @@ const accountSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    // Unique human-readable ID for account linking and ownership transfer
+    uniqueId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow null during migration
+      uppercase: true,
+      trim: true,
+      index: true,
+    },
     // parentAccountId is null for top-level accounts
     parentAccountId: {
       type: mongoose.Schema.Types.ObjectId,
