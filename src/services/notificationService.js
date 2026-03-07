@@ -326,9 +326,9 @@ const formatNotificationMessage = (type, data) => {
     week_locked: `${data.actorName} locked the week (${data.startDate} - ${data.endDate})`,
     week_unlocked: `${data.actorName} unlocked the week`,
 
-    cash_added: `${data.actorName} added ${data.amount} to cash box`,
-    bank_transfer: `${data.actorName} transferred ${data.amount} from ${data.bankAccountName} to cash box`,
-    cash_transferred: `${data.actorName} transferred ${data.amount} ${data.direction}`,
+    cash_added: `${data.actorName} added $${Number(data.amount).toFixed(2)} to cash box`,
+    bank_transfer: `${data.actorName} transferred $${Number(data.amount).toFixed(2)} from ${data.bankAccountName} to cash box`,
+    cash_transferred: `${data.actorName} transferred $${Number(data.amount).toFixed(2)} ${data.direction}`,
     cash_check_performed: `${data.managerName} performed cash check - ${data.status}`,
 
     time_off_allowance_updated: `Your time off allowance was updated to ${data.allowanceDays} days`,

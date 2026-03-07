@@ -479,6 +479,8 @@ export const transferBankToCash = async (req, res) => {
     console.log(`   User: ${displayName}`);
     console.log(`   From: ${bankAccount.name}`);
     console.log(`   Amount: $${amount}`);
+    console.log(`   Week: ${week._id}`);
+    console.log(`   Account: ${week.accountId}`);
     console.log(`   About to trigger notification...\n`);
 
     // Log activity
@@ -491,9 +493,15 @@ export const transferBankToCash = async (req, res) => {
       metadata: { weekId: week._id, bankAccountId: bankAccount._id, amount },
     });
 
+    console.log("💾 Activity log created");
+
     // Send notification
     console.log("🚀 Calling notifyAccountMembers for bank_transfer...");
-    notifyAccountMembers(
+    console.log(`   Type: bank_transfer`);
+    console.log(`   Account ID: ${week.accountId.toString()}`);
+    console.log(`   Actor: ${displayName}`);
+
+    await notifyAccountMembers(
       week.accountId.toString(),
       "bank_transfer",
       req.user.id,
@@ -502,7 +510,7 @@ export const transferBankToCash = async (req, res) => {
         weekId: week._id,
         bankAccountId: bankAccount._id,
         bankAccountName: bankAccount.name,
-        amount,
+        amount: amount,
         newBankBalance: bankAccount.balance,
         newCashBalance: week.cashBoxBalance,
         weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
@@ -510,6 +518,8 @@ export const transferBankToCash = async (req, res) => {
     ).catch((err) =>
       console.error("❌ Bank transfer notification error:", err),
     );
+
+    console.log("✅ Notification call completed\n");
 
     res.status(200).json({
       success: true,
