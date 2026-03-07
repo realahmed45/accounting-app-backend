@@ -353,10 +353,19 @@ const getNotificationRecipients = async (
   let recipients = [];
 
   if (notifyRoles.includes("all")) {
-    // Notify all members except actor
-    recipients = members
-      .filter((m) => m.userId._id.toString() !== actorUserId.toString())
-      .map((m) => m.userId);
+    // Notify all members (including actor for single-user accounts or testing)
+    // Filter out actor only if there are other members
+    const otherMembers = members.filter(
+      (m) => m.userId._id.toString() !== actorUserId.toString(),
+    );
+
+    if (otherMembers.length > 0) {
+      // Multi-user account - notify others only
+      recipients = otherMembers.map((m) => m.userId);
+    } else {
+      // Single-user account - notify self
+      recipients = members.map((m) => m.userId);
+    }
   } else if (notifyRoles.includes("assignedMember")) {
     // Notify only the assigned member
     if (data.assignedMemberId) {
