@@ -110,6 +110,12 @@ export const createExpense = async (req, res) => {
       userId: req.user.id,
     });
 
+    console.log("\n💰 EXPENSE CREATED!");
+    console.log(`   User: ${req.user.firstName} ${req.user.lastName}`);
+    console.log(`   Amount: ${amount}`);
+    console.log(`   Category: ${category}`);
+    console.log(`   About to trigger notification...\n`);
+
     res.status(201).json({
       success: true,
       data: expense,
@@ -126,6 +132,7 @@ export const createExpense = async (req, res) => {
     });
 
     // Send notifications
+    console.log("🚀 Calling notifyAccountMembers...");
     notifyAccountMembers(
       accountId,
       "expense_created",
@@ -139,7 +146,7 @@ export const createExpense = async (req, res) => {
         paymentSource: expense.paymentSource,
         date: expense.date,
       },
-    ).catch((err) => console.error("Notification error:", err));
+    ).catch((err) => console.error("❌ Notification error:", err));
   } catch (error) {
     res.status(500).json({
       success: false,
