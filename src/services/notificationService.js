@@ -189,6 +189,12 @@ const NOTIFICATION_TYPES = {
     category: "banking",
     notifyRoles: ["all"],
   },
+  bank_balance_adjusted: {
+    title: "Bank Balance Adjusted",
+    priority: "high",
+    category: "banking",
+    notifyRoles: ["all"],
+  },
   category_added: {
     title: "Category Added",
     priority: "low",
@@ -311,6 +317,7 @@ const formatNotificationMessage = (type, data) => {
     bank_account_added: `${data.actorName} added bank account: ${data.bankAccountName}`,
     bank_account_removed: `${data.actorName} removed bank account: ${data.bankAccountName}`,
     bank_account_updated: `${data.actorName} updated bank account: ${data.bankAccountName}`,
+    bank_balance_adjusted: `${data.actorName} adjusted ${data.accountName} balance ${data.difference >= 0 ? "+" : ""}$${Math.abs(data.difference).toFixed(2)}`,
 
     category_added: `${data.actorName} added category: ${data.categoryName}`,
     category_updated: `${data.actorName} updated category: ${data.categoryName}`,

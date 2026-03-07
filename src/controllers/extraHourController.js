@@ -3,6 +3,7 @@ import ActivityLog from "../models/ActivityLog.js";
 import AccountMember from "../models/AccountMember.js";
 import Account from "../models/Account.js";
 import TimeOffBalance from "../models/TimeOffBalance.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Get extra hours for an account
 // @route   GET /api/accounts/:id/schedule/extra-hours
@@ -27,10 +28,13 @@ export const getAll = async (req, res) => {
     });
 
     if (!member) {
-      return res.status(404).json({ success: false, message: "Member not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Member not found" });
     }
 
-    const isManager = member.role === "owner" || member.permissions?.manageSchedule;
+    const isManager =
+      member.role === "owner" || member.permissions?.manageSchedule;
 
     if (!isManager) {
       query.memberId = member._id;
@@ -59,7 +63,8 @@ export const getAll = async (req, res) => {
 // @access  Private
 export const submit = async (req, res) => {
   try {
-    const { date, startTime, endTime, reason, imageData, latitude, longitude } = req.body;
+    const { date, startTime, endTime, reason, imageData, latitude, longitude } =
+      req.body;
 
     const member = await AccountMember.findOne({
       accountId: req.params.id,
@@ -67,7 +72,9 @@ export const submit = async (req, res) => {
     });
 
     if (!member) {
-      return res.status(404).json({ success: false, message: "Member not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Member not found" });
     }
 
     // Overlap check
@@ -76,19 +83,22 @@ export const submit = async (req, res) => {
       memberId: member._id,
       date: new Date(date),
       status: { $ne: "rejected" },
-      $or: [
-        { startTime: { $lt: endTime }, endTime: { $gt: startTime } }
-      ]
+      $or: [{ startTime: { $lt: endTime }, endTime: { $gt: startTime } }],
     });
 
     if (existing) {
-      return res.status(409).json({ success: false, message: "Overlapping extra hours already exist for this date" });
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message: "Overlapping extra hours already exist for this date",
+        });
     }
 
     // Calculate duration
     const [startH, startM] = startTime.split(":").map(Number);
     const [endH, endM] = endTime.split(":").map(Number);
-    let duration = (endH * 60 + endM) - (startH * 60 + startM);
+    let duration = endH * 60 + endM - (startH * 60 + startM);
     if (duration < 0) duration += 24 * 60; // Handle overnight
 
     const record = await ExtraHour.create({
@@ -113,6 +123,21 @@ export const submit = async (req, res) => {
       action: "extra_hours_submitted",
       targetDescription: `Submitted ${duration} mins of extra hours for ${new Date(date).toLocaleDateString()}`,
     });
+
+    // Send notification to managers
+    notifyAccountMembers(
+      req.params.id,
+      "extra_hours_submitted",
+      req.user.id,
+      member.displayName,
+      {
+        memberId: member._id,
+        memberName: member.displayName,
+        hours: `${(duration / 60).toFixed(1)} hours`,
+        date: new Date(date).toLocaleDateString(),
+        reason,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,
@@ -140,7 +165,9 @@ export const review = async (req, res) => {
     });
 
     if (!record) {
-      return res.status(404).json({ success: false, message: "Record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Record not found" });
     }
 
     record.status = status;
@@ -160,9 +187,33 @@ export const review = async (req, res) => {
       accountId: req.params.id,
       actorUserId: req.user.id,
       actorDisplayName: req.user.firstName + " " + req.user.familyName,
-      action: status === "approved" ? "extra_hours_approved" : "extra_hours_rejected",
+      action:
+        status === "approved" ? "extra_hours_approved" : "extra_hours_rejected",
       targetDescription: `${status === "approved" ? "Approved" : "Rejected"} extra hours for ${new Date(record.date).toLocaleDateString()}`,
     });
+
+    // Get member details for notification
+    const member = await AccountMember.findById(record.memberId).populate(
+      "userId",
+      "firstName lastName",
+    );
+
+    // Send notification to the employee
+    notifyAccountMembers(
+      req.params.id,
+      status === "approved" ? "extra_hours_approved" : "extra_hours_rejected",
+      req.user.id,
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      {
+        memberId: record.memberId,
+        memberName: member.userId
+          ? `${member.userId.firstName} ${member.userId.lastName}`
+          : "Member",
+        hours: `${(record.durationMinutes / 60).toFixed(1)} hours`,
+        date: new Date(record.date).toLocaleDateString(),
+        rejectionNote: rejectionNote || "",
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,
@@ -187,13 +238,16 @@ const checkAndUpdateTimeOffCredit = async (accountId, memberId) => {
     accountId,
     memberId,
     status: "approved",
-    date: { 
+    date: {
       $gte: new Date(year, 0, 1),
-      $lte: new Date(year, 11, 31, 23, 59, 59)
-    }
+      $lte: new Date(year, 11, 31, 23, 59, 59),
+    },
   });
 
-  const totalMinutes = allApproved.reduce((sum, r) => sum + r.durationMinutes, 0);
+  const totalMinutes = allApproved.reduce(
+    (sum, r) => sum + r.durationMinutes,
+    0,
+  );
   const totalHours = totalMinutes / 60;
   const extraDaysEarned = Math.floor(totalHours / ratio);
 
@@ -206,7 +260,7 @@ const checkAndUpdateTimeOffCredit = async (accountId, memberId) => {
   if (balance.extraEarnedDays !== extraDaysEarned) {
     balance.extraEarnedDays = extraDaysEarned;
     await balance.save();
-    
+
     // Log credit event
     await ActivityLog.create({
       accountId,

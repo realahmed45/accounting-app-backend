@@ -7,6 +7,7 @@ import {
   generateAccountUniqueId,
   validateUniqueIdFormat,
 } from "../utils/generateUniqueId.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -436,6 +437,18 @@ export const createCategory = async (req, res) => {
       name: req.body.name,
     });
 
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "category_added",
+      req.user.id,
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      {
+        categoryId: category._id,
+        categoryName: category.name,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(201).json({
       success: true,
       data: category,
@@ -516,6 +529,18 @@ export const updateCategory = async (req, res) => {
 
     category.name = name.trim();
     await category.save();
+
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "category_updated",
+      req.user.id,
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      {
+        categoryId: category._id,
+        categoryName: category.name,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,
