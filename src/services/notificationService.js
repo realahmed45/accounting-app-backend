@@ -521,15 +521,26 @@ export const createNotification = async (
 
     // Check if email should be sent
     const shouldEmail = await shouldNotifyUser(userId, type, "email");
+    console.log(`   📧 Should send email to user ${userId}? ${shouldEmail}`);
+
     if (shouldEmail) {
       // Get user preferences to check quiet hours
       const preferences = await NotificationPreference.findOne({ userId });
-      if (preferences && !isWithinQuietHours(preferences.quietHours)) {
+      const inQuietHours =
+        preferences && isWithinQuietHours(preferences.quietHours);
+      console.log(`   🔕 In quiet hours? ${inQuietHours}`);
+
+      if (!inQuietHours) {
         // Send email notification (don't await to avoid blocking)
+        console.log(`   ✉️  Sending email notification...`);
         sendNotificationEmail(notification, userId).catch((err) =>
-          console.error("Error sending notification email:", err),
+          console.error("❌ Error sending notification email:", err),
         );
+      } else {
+        console.log(`   ⏰ Email blocked by quiet hours`);
       }
+    } else {
+      console.log(`   🚫 Email blocked by user preferences`);
     }
 
     return notification;

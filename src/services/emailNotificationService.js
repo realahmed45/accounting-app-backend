@@ -46,21 +46,65 @@ const getEmailSubject = (notification) => {
   const { type, data } = notification;
 
   const subjects = {
+    // Expenses
     expense_created: `New Expense: ${formatAmount(data.amount)} for ${data.category}`,
     expense_updated: `Expense Updated: ${data.category}`,
     expense_deleted: `Expense Deleted: ${formatAmount(data.amount)}`,
+    photo_uploaded: `Proof Photos Uploaded`,
+    photo_deleted: `Proof Photo Deleted`,
+
+    // Shifts
+    shift_created: `New Shift Created: ${data.shiftName || "Shift"}`,
+    shift_updated: `Shift Updated: ${data.shiftName || "Shift"}`,
     shift_assigned: `You've been assigned to ${data.shiftName} on ${formatDate(data.date)}`,
     shift_cancelled: `Shift Cancelled: ${data.shiftName}`,
+    shift_replaced: `Shift Replacement: ${data.shiftName}`,
     shift_checkin_submitted: `${data.memberName} checked in`,
     shift_checkout_submitted: `${data.memberName} checked out`,
+    shift_type_created: `New Shift Type: ${data.shiftTypeName}`,
+    shift_type_updated: `Shift Type Updated: ${data.shiftTypeName}`,
+
+    // Work Logs & Hours
+    work_log_added: `Work Log Added: ${data.memberName}`,
+    work_log_deleted: `Work Log Deleted`,
+    extra_hours_submitted: `Extra Hours Requested: ${data.hours}h`,
+    extra_hours_approved: `Extra Hours Approved: ${data.hours}h`,
+    extra_hours_rejected: `Extra Hours Rejected`,
+
+    // Team & Permissions
+    member_invited: `New Team Member Invited`,
+    member_removed: `Team Member Removed`,
     permission_granted: `New Permission Granted: ${data.permissionName}`,
     permission_revoked: `Permission Revoked: ${data.permissionName}`,
     ownership_transferred: `Account Ownership Transferred`,
+    ownership_transfer_initiated: `Ownership Transfer Request`,
+    ownership_correction_requested: `Ownership Correction Requested`,
+
+    // Banking
+    bank_account_added: `Bank Account Added: ${data.bankAccountName || data.bankName}`,
+    bank_account_updated: `Bank Account Updated: ${data.bankAccountName || data.bankName}`,
+    bank_account_removed: `Bank Account Removed`,
+    bank_balance_adjusted: `Bank Balance Adjusted`,
+    bank_transfer: `Bank Transfer: ${formatAmount(data.amount)} to Cash`,
+
+    // Categories
+    category_added: `New Category: ${data.categoryName}`,
+    category_updated: `Category Updated: ${data.categoryName}`,
+
+    // Weekly Operations
+    week_created: `New Week Created`,
     week_locked: `Week Locked: ${formatDate(data.startDate)} - ${formatDate(data.endDate)}`,
-    member_invited: `New Team Member Invited`,
-    bank_account_added: `Bank Account Added: ${data.bankAccountName}`,
-    extra_hours_approved: `Extra Hours Approved: ${data.hours}h`,
-    extra_hours_rejected: `Extra Hours Rejected`,
+    week_unlocked: `Week Unlocked`,
+    cash_added: `Cash Added: ${formatAmount(data.amount)}`,
+    cash_transferred: `Cash Transferred`,
+    cash_check_performed: `Cash Flow Check Completed`,
+
+    // Time Off
+    time_off_allowance_updated: `Time Off Allowance Updated`,
+    time_off_extra_day_earned: `You Earned an Extra Day Off!`,
+
+    // Settings
+    account_settings_changed: `Account Settings Changed`,
   };
 
   return subjects[type] || notification.title;
@@ -112,18 +156,29 @@ ${data.memberName ? `- Member: ${data.memberName}` : ""}
 ${data.memberEmail ? `- Email: ${data.memberEmail}` : ""}
 ${data.permissionName ? `- Permission: ${data.permissionName}` : ""}
     `.trim();
-  } else if (type.startsWith("bank_")) {
+  } else if (type.startsWith("bank_") || type === "bank_transfer") {
     detailsSection = `
 🏦 **Banking Details:**
 ${data.bankAccountName ? `- Account: ${data.bankAccountName}` : ""}
 ${data.bankName ? `- Bank: ${data.bankName}` : ""}
 ${data.amount ? `- Amount: ${formatAmount(data.amount)}` : ""}
+${data.newBankBalance !== undefined ? `- New Bank Balance: ${formatAmount(data.newBankBalance)}` : ""}
+${data.newCashBalance !== undefined ? `- New Cash Balance: ${formatAmount(data.newCashBalance)}` : ""}
+${data.note ? `- Note: "${data.note}"` : ""}
     `.trim();
-  } else if (type.startsWith("week_")) {
+  } else if (
+    type.startsWith("week_") ||
+    type === "cash_added" ||
+    type === "cash_transferred"
+  ) {
     detailsSection = `
 📆 **Week Details:**
 ${data.startDate ? `- Period: ${formatDate(data.startDate)} - ${formatDate(data.endDate)}` : ""}
+${data.weekPeriod ? `- Week: ${data.weekPeriod}` : ""}
+${data.amount ? `- Amount: ${formatAmount(data.amount)}` : ""}
+${data.newBalance !== undefined ? `- New Cash Balance: ${formatAmount(data.newBalance)}` : ""}
 ${data.totalExpenses ? `- Total Expenses: ${formatAmount(data.totalExpenses)}` : ""}
+${data.note ? `- Note: "${data.note}"` : ""}
     `.trim();
   } else if (
     type === "ownership_transferred" ||
