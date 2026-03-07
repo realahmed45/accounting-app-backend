@@ -182,9 +182,11 @@ export const sendNotificationEmail = async (notification, userId) => {
       user.firstName,
     );
 
-    console.log("📧 Sending notification email via EmailJS:");
-    console.log(`To: ${user.email}`);
-    console.log(`Subject: ${emailSubject}`);
+    console.log("\n📧 SENDING EMAIL via EmailJS:");
+    console.log(`   To: ${user.email} (${user.firstName})`);
+    console.log(`   Subject: ${emailSubject}`);
+    console.log(`   Service ID: ${SERVICE_ID}`);
+    console.log(`   Template ID: ${NOTIFICATION_TEMPLATE_ID}`);
 
     // Send email via EmailJS
     await emailjs.send(
@@ -203,7 +205,7 @@ export const sendNotificationEmail = async (notification, userId) => {
       },
       {
         publicKey: PUBLIC_KEY,
-      }
+      },
     );
 
     console.log("✅ Email sent successfully via EmailJS!");

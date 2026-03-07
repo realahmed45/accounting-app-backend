@@ -227,6 +227,12 @@ const NOTIFICATION_TYPES = {
     category: "weekly",
     notifyRoles: ["all"],
   },
+  bank_transfer: {
+    title: "Bank Transfer to Cash",
+    priority: "medium",
+    category: "banking",
+    notifyRoles: ["all"],
+  },
   cash_transferred: {
     title: "Cash Transferred",
     priority: "medium",
@@ -314,6 +320,7 @@ const formatNotificationMessage = (type, data) => {
     week_unlocked: `${data.actorName} unlocked the week`,
 
     cash_added: `${data.actorName} added ${data.amount} to cash box`,
+    bank_transfer: `${data.actorName} transferred ${data.amount} from ${data.bankAccountName} to cash box`,
     cash_transferred: `${data.actorName} transferred ${data.amount} ${data.direction}`,
     cash_check_performed: `${data.managerName} performed cash check - ${data.status}`,
 
@@ -527,11 +534,22 @@ export const notifyAccountMembers = async (
   data = {},
 ) => {
   try {
+    console.log(`\n🔔 CREATING NOTIFICATION:`);
+    console.log(`   Type: ${type}`);
+    console.log(`   Account: ${accountId}`);
+    console.log(`   Actor: ${actorDisplayName}`);
+    console.log(`   Data:`, JSON.stringify(data, null, 2));
+
     const recipients = await getNotificationRecipients(
       accountId,
       type,
       actorUserId,
       data,
+    );
+
+    console.log(`   Recipients: ${recipients.length} users`);
+    recipients.forEach((r) =>
+      console.log(`     - ${r.firstName} ${r.familyName} (${r.email})`),
     );
 
     const notifications = await Promise.all(
@@ -547,9 +565,14 @@ export const notifyAccountMembers = async (
       ),
     );
 
-    return notifications.filter((n) => n !== null);
+    const successfulNotifications = notifications.filter((n) => n !== null);
+    console.log(
+      `   ✅ Created ${successfulNotifications.length} notifications\n`,
+    );
+
+    return successfulNotifications;
   } catch (error) {
-    console.error("Error notifying account members:", error);
+    console.error("❌ Error notifying account members:", error);
     return [];
   }
 };

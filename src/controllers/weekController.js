@@ -485,6 +485,23 @@ export const transferBankToCash = async (req, res) => {
       metadata: { weekId: week._id, bankAccountId: bankAccount._id, amount },
     });
 
+    // Send notification
+    notifyAccountMembers(
+      week.accountId.toString(),
+      "bank_transfer",
+      req.user.id,
+      displayName,
+      {
+        weekId: week._id,
+        bankAccountId: bankAccount._id,
+        bankAccountName: bankAccount.name,
+        amount,
+        newBankBalance: bankAccount.balance,
+        newCashBalance: week.cashBoxBalance,
+        weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(200).json({
       success: true,
       data: {

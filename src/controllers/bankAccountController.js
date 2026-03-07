@@ -131,6 +131,7 @@ export const createBankAccount = async (req, res) => {
       displayName,
       {
         bankAccountId: bankAccount._id,
+        bankAccountName: name,
         accountName: name,
         bankName: bankName || "",
         accountType: accountType || "checking",
