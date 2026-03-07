@@ -71,11 +71,16 @@ export const getUnreadNotificationCount = async (req, res) => {
     const { accountId } = req.query;
     const count = await getUnreadCount(req.user.id, accountId || null);
 
+    console.log(
+      `\ud83d\udd14 Unread count requested for user ${req.user.id}: ${count}`,
+    );
+
     res.status(200).json({
       success: true,
-      data: { count },
+      data: { unreadCount: count },
     });
   } catch (error) {
+    console.error("\u274c Error getting unread count:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -288,6 +293,13 @@ export const getRecentNotifications = async (req, res) => {
 
     const unreadCount = await getUnreadCount(req.user.id);
 
+    console.log(`📥 Recent notifications for user ${req.user.id}:`);
+    console.log(`   - Total: ${notifications.length}`);
+    console.log(`   - Unread: ${unreadCount}`);
+    if (notifications.length > 0) {
+      console.log(`   - Latest: ${notifications[0].title}`);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -296,6 +308,7 @@ export const getRecentNotifications = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("\u274c Error fetching recent notifications:", error);
     res.status(500).json({
       success: false,
       message: error.message,
