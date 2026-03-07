@@ -3,7 +3,6 @@ import AccountMember from "../models/AccountMember.js";
 import Expense from "../models/Expense.js";
 import BankAccount from "../models/BankAccount.js";
 import ActivityLog from "../models/ActivityLog.js";
-import User from "../models/User.js";
 import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Add cash to box
@@ -51,13 +50,13 @@ export const addCashToBox = async (req, res) => {
     await week.save();
 
     // Log activity
-    const user = await User.findById(req.user.id);
-    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    const displayName =
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim();
     await ActivityLog.create({
       accountId: week.accountId,
       actorUserId: req.user.id,
       actorDisplayName: displayName,
-      action: "week_created",
+      action: "cash_added",
       targetDescription: `Added $${amount.toFixed(2)} to cash box${note ? `: ${note}` : ""}`,
       metadata: { weekId: week._id, amount, note },
     });
@@ -116,8 +115,8 @@ export const createWeek = async (req, res) => {
     });
 
     // Send notification
-    const user = await User.findById(req.user.id);
-    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    const displayName =
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim();
     notifyAccountMembers(accountId, "week_created", req.user.id, displayName, {
       weekId: week._id,
       startDate: week.startDate,
@@ -301,8 +300,8 @@ export const lockWeek = async (req, res) => {
     await week.save();
 
     // Log activity
-    const user = await User.findById(req.user.id);
-    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    const displayName =
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim();
     await ActivityLog.create({
       accountId: week.accountId,
       actorUserId: req.user.id,
@@ -473,8 +472,11 @@ export const transferBankToCash = async (req, res) => {
     week.cashBoxBalance += amount;
     await week.save();
 
+    const displayName =
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim();
+
     console.log("\n💸 BANK TRANSFER COMPLETED!");
-    console.log(`   User: ${user.firstName} ${user.lastName}`);
+    console.log(`   User: ${displayName}`);
     console.log(`   From: ${bankAccount.name}`);
     console.log(`   Amount: $${amount}`);
     console.log(`   About to trigger notification...\n`);
@@ -484,7 +486,7 @@ export const transferBankToCash = async (req, res) => {
       accountId: week.accountId,
       actorUserId: req.user.id,
       actorDisplayName: displayName,
-      action: "week_created",
+      action: "bank_transfer",
       targetDescription: `Transferred $${amount.toFixed(2)} from ${bankAccount.name} to cash box`,
       metadata: { weekId: week._id, bankAccountId: bankAccount._id, amount },
     });
