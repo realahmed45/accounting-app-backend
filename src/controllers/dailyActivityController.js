@@ -7,6 +7,7 @@ import BillPhoto from "../models/BillPhoto.js";
 import AccountMember from "../models/AccountMember.js";
 import User from "../models/User.js";
 import Week from "../models/Week.js";
+import ActivityLog from "../models/ActivityLog.js";
 
 // @desc    Get comprehensive daily breakdown
 // @route   GET /api/accounts/:id/daily-activity
@@ -35,60 +36,75 @@ export const getDailyBreakdown = async (req, res) => {
     }
 
     // Fetch all activities in parallel
-    const [expenses, shifts, checkIns, checkOuts, workLogs, billPhotos] =
-      await Promise.all([
-        // Expenses with user info
-        Expense.find({
-          accountId,
-          ...(weekId ? { weekId } : {}),
-          ...(startDate && endDate ? { date: dateQuery } : {}),
-        })
-          .populate("userId", "firstName familyName")
-          .sort({ date: 1, createdAt: 1 }),
+    const [
+      expenses,
+      shifts,
+      checkIns,
+      checkOuts,
+      workLogs,
+      billPhotos,
+      activityLogs,
+    ] = await Promise.all([
+      // Expenses with user info
+      Expense.find({
+        accountId,
+        ...(weekId ? { weekId } : {}),
+        ...(startDate && endDate ? { date: dateQuery } : {}),
+      })
+        .populate("userId", "firstName familyName")
+        .sort({ date: 1, createdAt: 1 }),
 
-        // Shifts
-        Shift.find({
-          accountId,
-          ...(startDate && endDate ? { date: dateQuery } : {}),
-        })
-          .populate("shiftTypeId")
-          .populate("assignedMemberId", "displayName userId")
-          .populate("createdBy", "firstName familyName")
-          .sort({ date: 1 }),
+      // Shifts
+      Shift.find({
+        accountId,
+        ...(startDate && endDate ? { date: dateQuery } : {}),
+      })
+        .populate("shiftTypeId")
+        .populate("assignedMemberId", "displayName userId")
+        .populate("createdBy", "firstName familyName")
+        .sort({ date: 1 }),
 
-        // Check-ins
-        ShiftCheckIn.find({
-          accountId,
-          ...(startDate && endDate ? { checkInTime: dateQuery } : {}),
-        })
-          .populate("memberId", "displayName userId")
-          .populate("shiftId")
-          .sort({ checkInTime: 1 }),
+      // Check-ins
+      ShiftCheckIn.find({
+        accountId,
+        ...(startDate && endDate ? { checkInTime: dateQuery } : {}),
+      })
+        .populate("memberId", "displayName userId")
+        .populate("shiftId")
+        .sort({ checkInTime: 1 }),
 
-        // Check-outs
-        ShiftCheckOut.find({
-          accountId,
-          ...(startDate && endDate ? { checkOutTime: dateQuery } : {}),
-        })
-          .populate("memberId", "displayName userId")
-          .populate("shiftId")
-          .sort({ checkOutTime: 1 }),
+      // Check-outs
+      ShiftCheckOut.find({
+        accountId,
+        ...(startDate && endDate ? { checkOutTime: dateQuery } : {}),
+      })
+        .populate("memberId", "displayName userId")
+        .populate("shiftId")
+        .sort({ checkOutTime: 1 }),
 
-        // Work logs
-        WorkLog.find({
-          accountId,
-          ...(startDate && endDate ? { date: dateQuery } : {}),
-        })
-          .populate("memberId", "displayName userId")
-          .populate("loggedBy", "firstName familyName")
-          .sort({ date: 1, createdAt: 1 }),
+      // Work logs
+      WorkLog.find({
+        accountId,
+        ...(startDate && endDate ? { date: dateQuery } : {}),
+      })
+        .populate("memberId", "displayName userId")
+        .populate("loggedBy", "firstName familyName")
+        .sort({ date: 1, createdAt: 1 }),
 
-        // Bill photos (for expenses)
-        BillPhoto.find({ accountId }).populate(
-          "uploadedBy",
-          "firstName familyName",
-        ),
-      ]);
+      // Bill photos (for expenses)
+      BillPhoto.find({ accountId }).populate(
+        "uploadedBy",
+        "firstName familyName",
+      ),
+
+      // Activity logs (all other activities)
+      ActivityLog.find({
+        accountId,
+        ...(startDate && endDate ? { createdAt: dateQuery } : {}),
+      })
+        .populate("actorUserId", "firstName familyName")
+        .sort({ createdAt: 1 }),
+    ]);
 
     // Get week details if weekId provided
     let week = null;
@@ -111,6 +127,7 @@ export const getDailyBreakdown = async (req, res) => {
           checkOuts: [],
           workLogs: [],
           photos: [],
+          activities: [],
         };
       }
 
@@ -159,6 +176,7 @@ export const getDailyBreakdown = async (req, res) => {
           checkOuts: [],
           workLogs: [],
           photos: [],
+          activities: [],
         };
       }
 
@@ -206,6 +224,7 @@ export const getDailyBreakdown = async (req, res) => {
           checkOuts: [],
           workLogs: [],
           photos: [],
+          activities: [],
         };
       }
 
@@ -241,6 +260,7 @@ export const getDailyBreakdown = async (req, res) => {
           checkOuts: [],
           workLogs: [],
           photos: [],
+          activities: [],
         };
       }
 
@@ -276,6 +296,7 @@ export const getDailyBreakdown = async (req, res) => {
           checkOuts: [],
           workLogs: [],
           photos: [],
+          activities: [],
         };
       }
 
@@ -302,6 +323,33 @@ export const getDailyBreakdown = async (req, res) => {
       });
     });
 
+    // Add activity logs (everything else)
+    activityLogs.forEach((activity) => {
+      const dateStr = activity.createdAt.toISOString().split("T")[0];
+      if (!dailyData[dateStr]) {
+        dailyData[dateStr] = {
+          date: dateStr,
+          expenses: [],
+          shifts: [],
+          checkIns: [],
+          checkOuts: [],
+          workLogs: [],
+          photos: [],
+          activities: [],
+        };
+      }
+
+      dailyData[dateStr].activities.push({
+        _id: activity._id,
+        action: activity.action,
+        actorName: activity.actorDisplayName,
+        actorUserId: activity.actorUserId,
+        description: activity.targetDescription,
+        metadata: activity.metadata || {},
+        timestamp: activity.createdAt,
+      });
+    });
+
     // Convert to array and sort by date
     const dailyArray = Object.values(dailyData).sort((a, b) =>
       a.date.localeCompare(b.date),
@@ -318,6 +366,7 @@ export const getDailyBreakdown = async (req, res) => {
           totalCheckIns: checkIns.length,
           totalCheckOuts: checkOuts.length,
           totalWorkLogs: workLogs.length,
+          totalActivities: activityLogs.length,
           totalExpenseAmount: expenses.reduce((sum, e) => sum + e.amount, 0),
         },
       },
