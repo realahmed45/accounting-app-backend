@@ -496,28 +496,43 @@ export const transferBankToCash = async (req, res) => {
     console.log("💾 Activity log created");
 
     // Send notification
-    console.log("🚀 Calling notifyAccountMembers for bank_transfer...");
+    console.log("\n🚀 CALLING notifyAccountMembers for bank_transfer...");
     console.log(`   Type: bank_transfer`);
     console.log(`   Account ID: ${week.accountId.toString()}`);
-    console.log(`   Actor: ${displayName}`);
+    console.log(`   Actor User ID: ${req.user.id}`);
+    console.log(`   Actor Display Name: ${displayName}`);
+    console.log(`   Data:`, {
+      weekId: week._id,
+      bankAccountId: bankAccount._id,
+      bankAccountName: bankAccount.name,
+      amount: amount,
+      newBankBalance: bankAccount.balance,
+      newCashBalance: week.cashBoxBalance,
+    });
 
-    await notifyAccountMembers(
-      week.accountId.toString(),
-      "bank_transfer",
-      req.user.id,
-      displayName,
-      {
-        weekId: week._id,
-        bankAccountId: bankAccount._id,
-        bankAccountName: bankAccount.name,
-        amount: amount,
-        newBankBalance: bankAccount.balance,
-        newCashBalance: week.cashBoxBalance,
-        weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
-      },
-    ).catch((err) =>
-      console.error("❌ Bank transfer notification error:", err),
-    );
+    try {
+      await notifyAccountMembers(
+        week.accountId.toString(),
+        "bank_transfer",
+        req.user.id,
+        displayName,
+        {
+          weekId: week._id,
+          bankAccountId: bankAccount._id,
+          bankAccountName: bankAccount.name,
+          amount: amount,
+          newBankBalance: bankAccount.balance,
+          newCashBalance: week.cashBoxBalance,
+          weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
+        },
+      );
+      console.log("   ✅ notifyAccountMembers completed successfully");
+    } catch (err) {
+      console.error("   ❌ Bank transfer notification error:");
+      console.error(`   Error message: ${err.message}`);
+      console.error(`   Error stack:`, err.stack);
+      throw err; // Re-throw to see in response
+    }
 
     console.log("✅ Notification call completed\n");
 

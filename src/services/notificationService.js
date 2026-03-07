@@ -520,22 +520,42 @@ export const createNotification = async (
     });
 
     // Check if email should be sent
+    console.log(`\n📧 EMAIL CHECK FOR USER ${userId}:`);
     const shouldEmail = await shouldNotifyUser(userId, type, "email");
-    console.log(`   📧 Should send email to user ${userId}? ${shouldEmail}`);
+    console.log(`   Should send email? ${shouldEmail}`);
 
     if (shouldEmail) {
       // Get user preferences to check quiet hours
       const preferences = await NotificationPreference.findOne({ userId });
+      console.log(`   User preferences found: ${!!preferences}`);
+
+      if (preferences) {
+        console.log(`   Email frequency: ${preferences.emailFrequency}`);
+        console.log(
+          `   Quiet hours enabled: ${preferences.quietHours?.enabled}`,
+        );
+        if (preferences.quietHours?.enabled) {
+          console.log(
+            `   Quiet hours: ${preferences.quietHours.startTime} - ${preferences.quietHours.endTime}`,
+          );
+        }
+      }
+
       const inQuietHours =
         preferences && isWithinQuietHours(preferences.quietHours);
-      console.log(`   🔕 In quiet hours? ${inQuietHours}`);
+      console.log(`   In quiet hours? ${inQuietHours}`);
 
       if (!inQuietHours) {
-        // Send email notification (don't await to avoid blocking)
-        console.log(`   ✉️  Sending email notification...`);
-        sendNotificationEmail(notification, userId).catch((err) =>
-          console.error("❌ Error sending notification email:", err),
-        );
+        // Send email notification (await to see errors)
+        console.log(`   ✉️  ATTEMPTING TO SEND EMAIL...`);
+        try {
+          await sendNotificationEmail(notification, userId);
+          console.log(`   ✅ Email sent successfully!`);
+        } catch (err) {
+          console.error(`   ❌ EMAIL SENDING FAILED:`);
+          console.error(`   Error message: ${err.message}`);
+          console.error(`   Error stack:`, err.stack);
+        }
       } else {
         console.log(`   ⏰ Email blocked by quiet hours`);
       }

@@ -240,11 +240,14 @@ export const sendNotificationEmail = async (notification, userId) => {
     console.log("\n📧 SENDING EMAIL via EmailJS:");
     console.log(`   To: ${user.email} (${user.firstName})`);
     console.log(`   Subject: ${emailSubject}`);
+    console.log(`   Notification Type: ${notification.type}`);
     console.log(`   Service ID: ${SERVICE_ID}`);
     console.log(`   Template ID: ${NOTIFICATION_TEMPLATE_ID}`);
+    console.log(`   Public Key: ${PUBLIC_KEY}`);
 
     // Send email via EmailJS
-    await emailjs.send(
+    console.log(`   🚀 Calling emailjs.send()...`);
+    const result = await emailjs.send(
       SERVICE_ID,
       NOTIFICATION_TEMPLATE_ID,
       {
@@ -263,7 +266,8 @@ export const sendNotificationEmail = async (notification, userId) => {
       },
     );
 
-    console.log("✅ Email sent successfully via EmailJS!");
+    console.log(`   ✅ EmailJS API Response:`, result);
+    console.log("   ✅ Email sent successfully via EmailJS!");
 
     // Update notification as email sent
     notification.emailSent = true;
@@ -272,8 +276,15 @@ export const sendNotificationEmail = async (notification, userId) => {
 
     return true;
   } catch (error) {
-    console.error("Error sending notification email:", error);
-    return false;
+    console.error("\n❌ ERROR SENDING NOTIFICATION EMAIL:");
+    console.error(`   Error Type: ${error.constructor.name}`);
+    console.error(`   Error Message: ${error.message}`);
+    console.error(`   Error Code: ${error.code}`);
+    console.error(`   Full Error:`, error);
+    if (error.response) {
+      console.error(`   API Response:`, error.response);
+    }
+    throw error; // Re-throw to see in calling function
   }
 };
 
