@@ -1,6 +1,8 @@
 import BillPhoto from "../models/BillPhoto.js";
 import Expense from "../models/Expense.js";
 import Account from "../models/Account.js";
+import AccountMember from "../models/AccountMember.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Upload bill photo
 // @route   POST /api/photos/upload/:expenseId
@@ -24,8 +26,14 @@ export const uploadBillPhoto = async (req, res) => {
     }
 
     // Verify ownership and permission
-    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
+    const member = await AccountMember.findOne({
+      accountId: expense.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.makeExpense)
+    ) {
       return res.status(401).json({
         success: false,
         message: "Not authorized to upload photos for this account",
@@ -45,6 +53,22 @@ export const uploadBillPhoto = async (req, res) => {
       mimeType: req.file.mimetype,
       uploadedBy: req.user.id,
     });
+
+    // Send notification
+    notifyAccountMembers(
+      expense.accountId.toString(),
+      "photo_uploaded",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        expenseId: expense._id,
+        photoId: billPhoto._id,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        expenseAmount: expense.amount,
+        expenseCategory: expense.category,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,
@@ -123,6 +147,22 @@ export const deletePhoto = async (req, res) => {
 
     // Delete from database
     await photo.deleteOne();
+
+    // Send notification
+    const expense = await Expense.findById(photo.expenseId);
+    notifyAccountMembers(
+      photo.accountId.toString(),
+      "photo_deleted",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        expenseId: photo.expenseId,
+        photoId: photo._id,
+        fileName: photo.fileName,
+        expenseAmount: expense?.amount,
+        expenseCategory: expense?.category,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,

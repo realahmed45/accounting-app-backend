@@ -7,6 +7,7 @@ import {
   deleteAccount,
   getCategories,
   createCategory,
+  updateCategory,
   getPeople,
   createPerson,
   findAccountByUniqueId,
@@ -65,6 +66,10 @@ router
   .route("/:id/categories")
   .get(protect, getCategories)
   .post(protect, requirePermission("addCategories"), createCategory);
+
+router
+  .route("/:id/categories/:categoryId")
+  .put(protect, requirePermission("addCategories"), updateCategory);
 
 router.route("/:id/people").get(protect, getPeople).post(protect, createPerson);
 

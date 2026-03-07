@@ -3,6 +3,7 @@ import BankAccount from "../models/BankAccount.js";
 import ActivityLog from "../models/ActivityLog.js";
 import User from "../models/User.js";
 import Account from "../models/Account.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // Helper – verify account membership and return member record
 const verifyAccountMembership = async (accountId, userId) => {
@@ -122,6 +123,22 @@ export const createBankAccount = async (req, res) => {
       metadata: { bankAccountId: bankAccount._id, initialBalance: balance },
     });
 
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "bank_account_added",
+      req.user.id,
+      displayName,
+      {
+        bankAccountId: bankAccount._id,
+        accountName: name,
+        bankName: bankName || "",
+        accountType: accountType || "checking",
+        balance: balance || 0,
+        currency: finalCurrency,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(201).json({ success: true, data: bankAccount });
   } catch (err) {
     if (err.name === "ValidationError") {
@@ -170,6 +187,19 @@ export const updateBankAccount = async (req, res) => {
       metadata: { bankAccountId: bankAccount._id },
     });
 
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "bank_account_updated",
+      req.user.id,
+      displayName,
+      {
+        bankAccountId: bankAccount._id,
+        accountName: bankAccount.name,
+        bankName: bankAccount.bankName,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(200).json({ success: true, data: bankAccount });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -211,6 +241,19 @@ export const deleteBankAccount = async (req, res) => {
       targetDescription: `Removed bank account: ${bankAccount.name}`,
       metadata: { bankAccountId: bankAccount._id },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "bank_account_removed",
+      req.user.id,
+      displayName,
+      {
+        bankAccountId: bankAccount._id,
+        accountName: bankAccount.name,
+        bankName: bankAccount.bankName,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
@@ -278,6 +321,23 @@ export const adjustBalance = async (req, res) => {
         reason,
       },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "bank_balance_adjusted",
+      req.user.id,
+      displayName,
+      {
+        bankAccountId: bankAccount._id,
+        accountName: bankAccount.name,
+        bankName: bankAccount.bankName,
+        oldBalance,
+        newBalance,
+        difference,
+        reason: reason || "",
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({ success: true, data: bankAccount });
   } catch (err) {

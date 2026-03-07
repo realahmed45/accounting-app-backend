@@ -4,9 +4,17 @@ import ActivityLog from "../models/ActivityLog.js";
 import AccountMember from "../models/AccountMember.js";
 import ShiftCheckIn from "../models/ShiftCheckIn.js";
 import ShiftCheckOut from "../models/ShiftCheckOut.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // Helper to check for overlapping shifts
-const hasOverlap = async (accountId, memberId, date, startTime, endTime, excludeShiftId = null) => {
+const hasOverlap = async (
+  accountId,
+  memberId,
+  date,
+  startTime,
+  endTime,
+  excludeShiftId = null,
+) => {
   if (!memberId) return false;
 
   const query = {
@@ -78,7 +86,9 @@ export const getMine = async (req, res) => {
     });
 
     if (!member) {
-      return res.status(404).json({ success: false, message: "Member not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Member not found" });
     }
 
     const today = new Date();
@@ -103,10 +113,10 @@ export const getMine = async (req, res) => {
     const enrichedShifts = shifts.map((shift) => {
       const shiftObj = shift.toObject();
       shiftObj.hasCheckedIn = !!checkIns.find(
-        (ci) => ci.shiftId.toString() === shift._id.toString()
+        (ci) => ci.shiftId.toString() === shift._id.toString(),
       );
       shiftObj.hasCheckedOut = !!checkOuts.find(
-        (co) => co.shiftId.toString() === shift._id.toString()
+        (co) => co.shiftId.toString() === shift._id.toString(),
       );
       return shiftObj;
     });
@@ -128,17 +138,33 @@ export const getMine = async (req, res) => {
 // @access  Private (Manager only)
 export const create = async (req, res) => {
   try {
-    const { shiftTypeId, date, assignedMemberId, notes, adHocStart, adHocEnd, adHocLabel } = req.body;
+    const {
+      shiftTypeId,
+      date,
+      assignedMemberId,
+      notes,
+      adHocStart,
+      adHocEnd,
+      adHocLabel,
+    } = req.body;
 
     let startTime, endTime;
     if (shiftTypeId) {
       const type = await ShiftType.findById(shiftTypeId);
-      if (!type) return res.status(404).json({ success: false, message: "Shift type not found" });
+      if (!type)
+        return res
+          .status(404)
+          .json({ success: false, message: "Shift type not found" });
       startTime = type.startTime;
       endTime = type.endTime;
     } else {
       if (!adHocStart || !adHocEnd) {
-        return res.status(400).json({ success: false, message: "Ad-hoc shifts require start and end times" });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Ad-hoc shifts require start and end times",
+          });
       }
       startTime = adHocStart;
       endTime = adHocEnd;
@@ -146,9 +172,20 @@ export const create = async (req, res) => {
 
     // Conflict detection
     if (assignedMemberId) {
-      const overlap = await hasOverlap(req.params.id, assignedMemberId, new Date(date), startTime, endTime);
+      const overlap = await hasOverlap(
+        req.params.id,
+        assignedMemberId,
+        new Date(date),
+        startTime,
+        endTime,
+      );
       if (overlap) {
-        return res.status(409).json({ success: false, message: "Member already has an overlapping shift on this date" });
+        return res
+          .status(409)
+          .json({
+            success: false,
+            message: "Member already has an overlapping shift on this date",
+          });
       }
     }
 
@@ -174,6 +211,43 @@ export const create = async (req, res) => {
       targetDescription: `Created shift for ${new Date(date).toLocaleDateString()}`,
     });
 
+    // Send notification
+    const shiftData = {
+      shiftId: shift._id,
+      date: shift.date,
+      status: shift.status,
+      notes: shift.notes,
+    };
+
+    if (shiftTypeId) {
+      const type = await ShiftType.findById(shiftTypeId);
+      shiftData.shiftName = type?.name;
+      shiftData.startTime = type?.startTime;
+      shiftData.endTime = type?.endTime;
+      shiftData.location = type?.location;
+    } else {
+      shiftData.shiftName = adHocLabel || "Ad-hoc Shift";
+      shiftData.startTime = adHocStart;
+      shiftData.endTime = adHocEnd;
+    }
+
+    if (assignedMemberId) {
+      const assignedMember =
+        await AccountMember.findById(assignedMemberId).populate("userId");
+      shiftData.assignedMemberName = assignedMember?.userId
+        ? `${assignedMember.userId.firstName} ${assignedMember.userId.familyName}`.trim()
+        : "Unknown";
+      shiftData.assignedMemberId = assignedMemberId;
+    }
+
+    notifyAccountMembers(
+      req.params.id,
+      assignedMemberId ? "shift_assigned" : "shift_created",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      shiftData,
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(201).json({
       success: true,
       data: shift,
@@ -195,10 +269,42 @@ export const update = async (req, res) => {
     const shift = await Shift.findOneAndUpdate(
       { _id: req.params.shiftId, accountId: req.params.id },
       { notes, status },
-      { new: true }
-    );
+      { new: true },
+    ).populate("shiftTypeId assignedMemberId");
 
-    if (!shift) return res.status(404).json({ success: false, message: "Shift not found" });
+    if (!shift)
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
+
+    // Send notification
+    const shiftData = {
+      shiftId: shift._id,
+      date: shift.date,
+      status: shift.status,
+      notes: shift.notes,
+      shiftName: shift.shiftTypeId?.name || shift.adHocLabel || "Shift",
+      startTime: shift.shiftTypeId?.startTime || shift.adHocStart,
+      endTime: shift.shiftTypeId?.endTime || shift.adHocEnd,
+      location: shift.shiftTypeId?.location,
+    };
+
+    if (shift.assignedMemberId) {
+      const member = await AccountMember.findById(
+        shift.assignedMemberId,
+      ).populate("userId");
+      shiftData.assignedMemberName = member?.userId
+        ? `${member.userId.firstName} ${member.userId.familyName}`.trim()
+        : "Unknown";
+    }
+
+    notifyAccountMembers(
+      req.params.id,
+      "shift_updated",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      shiftData,
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,
@@ -220,10 +326,41 @@ export const cancel = async (req, res) => {
     const shift = await Shift.findOneAndUpdate(
       { _id: req.params.shiftId, accountId: req.params.id },
       { status: "cancelled" },
-      { new: true }
-    );
+      { new: true },
+    ).populate("shiftTypeId assignedMemberId");
 
-    if (!shift) return res.status(404).json({ success: false, message: "Shift not found" });
+    if (!shift)
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
+
+    // Send notification
+    const shiftData = {
+      shiftId: shift._id,
+      date: shift.date,
+      shiftName: shift.shiftTypeId?.name || shift.adHocLabel || "Shift",
+      startTime: shift.shiftTypeId?.startTime || shift.adHocStart,
+      endTime: shift.shiftTypeId?.endTime || shift.adHocEnd,
+      location: shift.shiftTypeId?.location,
+    };
+
+    if (shift.assignedMemberId) {
+      const member = await AccountMember.findById(
+        shift.assignedMemberId,
+      ).populate("userId");
+      shiftData.assignedMemberName = member?.userId
+        ? `${member.userId.firstName} ${member.userId.familyName}`.trim()
+        : "Unknown";
+      shiftData.affectedMemberId = shift.assignedMemberId._id;
+    }
+
+    notifyAccountMembers(
+      req.params.id,
+      "shift_cancelled",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      shiftData,
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,
@@ -243,17 +380,39 @@ export const cancel = async (req, res) => {
 export const assign = async (req, res) => {
   try {
     const { memberId } = req.body;
-    const shift = await Shift.findOne({ _id: req.params.shiftId, accountId: req.params.id }).populate("shiftTypeId");
+    const shift = await Shift.findOne({
+      _id: req.params.shiftId,
+      accountId: req.params.id,
+    }).populate("shiftTypeId");
 
-    if (!shift) return res.status(404).json({ success: false, message: "Shift not found" });
+    if (!shift)
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
 
-    const startTime = shift.shiftTypeId ? shift.shiftTypeId.startTime : shift.adHocStart;
-    const endTime = shift.shiftTypeId ? shift.shiftTypeId.endTime : shift.adHocEnd;
+    const startTime = shift.shiftTypeId
+      ? shift.shiftTypeId.startTime
+      : shift.adHocStart;
+    const endTime = shift.shiftTypeId
+      ? shift.shiftTypeId.endTime
+      : shift.adHocEnd;
 
     // Conflict detection
-    const overlap = await hasOverlap(req.params.id, memberId, shift.date, startTime, endTime, shift._id);
+    const overlap = await hasOverlap(
+      req.params.id,
+      memberId,
+      shift.date,
+      startTime,
+      endTime,
+      shift._id,
+    );
     if (overlap) {
-      return res.status(409).json({ success: false, message: "Member already has an overlapping shift on this date" });
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message: "Member already has an overlapping shift on this date",
+        });
     }
 
     const oldMemberId = shift.assignedMemberId;
@@ -267,6 +426,38 @@ export const assign = async (req, res) => {
     }
 
     await shift.save();
+
+    // Send notification
+    const newMember = await AccountMember.findById(memberId).populate("userId");
+    const shiftData = {
+      shiftId: shift._id,
+      date: shift.date,
+      shiftName: shift.shiftTypeId?.name || shift.adHocLabel || "Shift",
+      startTime: shift.shiftTypeId?.startTime || shift.adHocStart,
+      endTime: shift.shiftTypeId?.endTime || shift.adHocEnd,
+      location: shift.shiftTypeId?.location,
+      assignedMemberName: newMember?.userId
+        ? `${newMember.userId.firstName} ${newMember.userId.familyName}`.trim()
+        : "Unknown",
+      assignedMemberId: memberId,
+    };
+
+    if (oldMemberId && oldMemberId.toString() !== memberId) {
+      const oldMember =
+        await AccountMember.findById(oldMemberId).populate("userId");
+      shiftData.replacedMemberName = oldMember?.userId
+        ? `${oldMember.userId.firstName} ${oldMember.userId.familyName}`.trim()
+        : "Unknown";
+      shiftData.replacedMemberId = oldMemberId;
+    }
+
+    notifyAccountMembers(
+      req.params.id,
+      oldMemberId ? "shift_replaced" : "shift_assigned",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      shiftData,
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,

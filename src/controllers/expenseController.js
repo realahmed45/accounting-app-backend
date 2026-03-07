@@ -4,6 +4,7 @@ import AccountMember from "../models/AccountMember.js";
 import BillPhoto from "../models/BillPhoto.js";
 import BankAccount from "../models/BankAccount.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Create new expense
 // @route   POST /api/expenses
@@ -22,7 +23,10 @@ export const createExpense = async (req, res) => {
     } = req.body;
 
     // Verify account membership
-    const member = await AccountMember.findOne({ accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -114,11 +118,28 @@ export const createExpense = async (req, res) => {
     logActivity({
       accountId: accountId.toString(),
       actorUserId: req.user.id.toString(),
-      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      actorDisplayName:
+        `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
       action: "expense_created",
       targetDescription: `Created ${paymentSource} expense: ${amount} ${category}`,
       metadata: { expenseId: expense._id, amount, category, paymentSource },
     });
+
+    // Send notifications
+    notifyAccountMembers(
+      accountId,
+      "expense_created",
+      req.user.id,
+      `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      {
+        expenseId: expense._id,
+        amount: `${expense.amount}`,
+        category: expense.category,
+        note: expense.note,
+        paymentSource: expense.paymentSource,
+        date: expense.date,
+      },
+    ).catch((err) => console.error("Notification error:", err));
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -142,7 +163,10 @@ export const getExpensesByWeek = async (req, res) => {
     }
 
     // Verify membership
-    const member = await AccountMember.findOne({ accountId: week.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: week.accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -172,7 +196,10 @@ export const getExpensesByWeek = async (req, res) => {
 // @access  Private
 export const getExpensesByAccount = async (req, res) => {
   try {
-    const member = await AccountMember.findOne({ accountId: req.params.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: req.params.accountId,
+      userId: req.user.id,
+    });
 
     if (!member) {
       return res.status(403).json({
@@ -224,7 +251,10 @@ export const getExpense = async (req, res) => {
     }
 
     // Verify membership
-    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
+    const member = await AccountMember.findOne({
+      accountId: expense.accountId,
+      userId: req.user.id,
+    });
     if (!member) {
       return res.status(403).json({
         success: false,
@@ -265,8 +295,14 @@ export const updateExpense = async (req, res) => {
     }
 
     // Verify membership and permission
-    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
+    const member = await AccountMember.findOne({
+      accountId: expense.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.makeExpense)
+    ) {
       return res.status(403).json({
         success: false,
         message: "No permission to update expenses",
@@ -295,11 +331,32 @@ export const updateExpense = async (req, res) => {
     logActivity({
       accountId: expense.accountId.toString(),
       actorUserId: req.user.id.toString(),
-      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      actorDisplayName:
+        `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
       action: "expense_updated",
       targetDescription: `Updated expense: ${expense.amount} ${expense.category}`,
-      metadata: { expenseId: expense._id, amount: expense.amount, category: expense.category },
+      metadata: {
+        expenseId: expense._id,
+        amount: expense.amount,
+        category: expense.category,
+      },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      expense.accountId.toString(),
+      "expense_updated",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        expenseId: expense._id,
+        amount: `${expense.amount}`,
+        category: expense.category,
+        note: expense.note,
+        paymentSource: expense.paymentSource,
+        date: expense.date,
+      },
+    ).catch((err) => console.error("Notification error:", err));
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -323,8 +380,14 @@ export const deleteExpense = async (req, res) => {
     }
 
     // Verify membership and permission
-    const member = await AccountMember.findOne({ accountId: expense.accountId, userId: req.user.id });
-    if (!member || (member.role !== "owner" && !member.permissions.makeExpense)) {
+    const member = await AccountMember.findOne({
+      accountId: expense.accountId,
+      userId: req.user.id,
+    });
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.makeExpense)
+    ) {
       return res.status(403).json({
         success: false,
         message: "No permission to delete expenses",
@@ -367,11 +430,32 @@ export const deleteExpense = async (req, res) => {
     logActivity({
       accountId: expense.accountId.toString(),
       actorUserId: req.user.id.toString(),
-      actorDisplayName: `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
+      actorDisplayName:
+        `${req.user.firstName} ${req.user.lastName || req.user.familyName || ""}`.trim(),
       action: "expense_deleted",
       targetDescription: `Deleted expense: ${expense.amount} ${expense.category}`,
-      metadata: { expenseId: expense._id, amount: expense.amount, category: expense.category },
+      metadata: {
+        expenseId: expense._id,
+        amount: expense.amount,
+        category: expense.category,
+      },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      expense.accountId.toString(),
+      "expense_deleted",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        expenseId: expense._id,
+        amount: `${expense.amount}`,
+        category: expense.category,
+        note: expense.note,
+        paymentSource: expense.paymentSource,
+        date: expense.date,
+      },
+    ).catch((err) => console.error("Notification error:", err));
   } catch (error) {
     res.status(500).json({
       success: false,

@@ -12,6 +12,8 @@ import expenseRoutes from "./routes/expenses.js";
 import photoRoutes from "./routes/photos.js";
 import invitationRoutes from "./routes/invitations.js";
 import scheduleRoutes from "./routes/schedule.js";
+import dailyActivityRoutes from "./routes/dailyActivity.js";
+import notificationRoutes from "./routes/notifications.js";
 
 // Load env vars
 dotenv.config();
@@ -36,6 +38,8 @@ app.use("/api/expenses", expenseRoutes);
 app.use("/api/photos", photoRoutes);
 app.use("/api/invitations", invitationRoutes);
 app.use("/api/accounts", scheduleRoutes);
+app.use("/api/accounts", dailyActivityRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {

@@ -3,6 +3,7 @@ import ShiftCheckIn from "../models/ShiftCheckIn.js";
 import Shift from "../models/Shift.js";
 import ActivityLog from "../models/ActivityLog.js";
 import AccountMember from "../models/AccountMember.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Submit shift check-out
 // @route   POST /api/accounts/:id/schedule/shifts/:shiftId/checkout
@@ -18,30 +19,47 @@ export const submit = async (req, res) => {
     });
 
     if (!member) {
-      return res.status(404).json({ success: false, message: "Member not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Member not found" });
     }
 
     const shift = await Shift.findOne({ _id: shiftId, accountId });
 
     if (!shift) {
-      return res.status(404).json({ success: false, message: "Shift not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
     }
 
     // Validation: Own shift
     if (shift.assignedMemberId.toString() !== member._id.toString()) {
-      return res.status(403).json({ success: false, message: "This shift is not assigned to you" });
+      return res
+        .status(403)
+        .json({ success: false, message: "This shift is not assigned to you" });
     }
 
     // Validation: Must have checked in first
     const checkIn = await ShiftCheckIn.findOne({ shiftId });
     if (!checkIn) {
-      return res.status(400).json({ success: false, message: "No check-in found for this shift. You must check in before checking out." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message:
+            "No check-in found for this shift. You must check in before checking out.",
+        });
     }
 
     // Validation: One check-out per shift
     const existing = await ShiftCheckOut.findOne({ shiftId });
     if (existing) {
-      return res.status(400).json({ success: false, message: "Check-out already submitted for this shift" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Check-out already submitted for this shift",
+        });
     }
 
     const checkOut = await ShiftCheckOut.create({
@@ -64,6 +82,34 @@ export const submit = async (req, res) => {
       // I should add it to the enum if possible, or use a generic one.
       targetDescription: `Checked out from shift on ${new Date(shift.date).toLocaleDateString()}`,
     });
+
+    // Send notification
+    const shiftPopulated =
+      await Shift.findById(shiftId).populate("shiftTypeId");
+    const duration = Math.floor(
+      (checkOut.createdAt - checkIn.createdAt) / 1000 / 60,
+    ); // minutes
+    notifyAccountMembers(
+      accountId,
+      "shift_checkout_submitted",
+      req.user.id,
+      member.displayName,
+      {
+        shiftId,
+        memberId: member._id,
+        memberName: member.displayName,
+        date: new Date(shift.date),
+        shiftName:
+          shiftPopulated?.shiftTypeId?.name ||
+          shiftPopulated?.adHocLabel ||
+          "Shift",
+        checkInTime: checkIn.createdAt,
+        checkOutTime: checkOut.createdAt,
+        duration,
+        locationLabel: checkOut.locationLabel,
+        hasPhoto: !!imageData,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,
@@ -88,7 +134,9 @@ export const get = async (req, res) => {
     }).populate("memberId", "displayName");
 
     if (!checkOut) {
-      return res.status(404).json({ success: false, message: "Check-out not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Check-out not found" });
     }
 
     res.status(200).json({

@@ -4,6 +4,7 @@ import Expense from "../models/Expense.js";
 import BankAccount from "../models/BankAccount.js";
 import ActivityLog from "../models/ActivityLog.js";
 import User from "../models/User.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Add cash to box
 // @route   POST /api/weeks/:id/add-cash
@@ -61,6 +62,21 @@ export const addCashToBox = async (req, res) => {
       metadata: { weekId: week._id, amount, note },
     });
 
+    // Send notification
+    notifyAccountMembers(
+      week.accountId.toString(),
+      "cash_added",
+      req.user.id,
+      displayName,
+      {
+        weekId: week._id,
+        amount,
+        note: note || "",
+        newBalance: week.cashBoxBalance,
+        weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(200).json({ success: true, data: week });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -98,6 +114,17 @@ export const createWeek = async (req, res) => {
       endDate,
       cashBoxBalance: cashBoxBalance || 0,
     });
+
+    // Send notification
+    const user = await User.findById(req.user.id);
+    const displayName = user ? `${user.firstName} ${user.lastName}` : "System";
+    notifyAccountMembers(accountId, "week_created", req.user.id, displayName, {
+      weekId: week._id,
+      startDate: week.startDate,
+      endDate: week.endDate,
+      cashBoxBalance: week.cashBoxBalance,
+      weekPeriod: `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`,
+    }).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,
@@ -284,6 +311,21 @@ export const lockWeek = async (req, res) => {
       targetDescription: `Locked week ${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
       metadata: { weekId: week._id },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      week.accountId.toString(),
+      "week_locked",
+      req.user.id,
+      displayName,
+      {
+        weekId: week._id,
+        startDate: week.startDate,
+        endDate: week.endDate,
+        weekPeriod: `${new Date(week.startDate).toLocaleDateString()} - ${new Date(week.endDate).toLocaleDateString()}`,
+        finalCashBalance: week.cashBoxBalance,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,

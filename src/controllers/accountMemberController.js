@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import Invitation from "../models/Invitation.js";
 import OwnershipTransferRequest from "../models/OwnershipTransferRequest.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -180,6 +181,22 @@ export const addMember = async (req, res) => {
       metadata: { email: normalizedEmail, permissions: grantedPermissions },
     });
 
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "member_invited",
+      req.user.id,
+      inviterName,
+      {
+        email: normalizedEmail,
+        displayName: displayName || "",
+        permissions: Object.keys(grantedPermissions)
+          .filter((k) => grantedPermissions[k])
+          .join(", "),
+        viewOnly,
+      },
+    ).catch((err) => console.error("Notification error:", err));
+
     res.status(201).json({
       success: true,
       inviteToken: token,
@@ -271,6 +288,48 @@ export const updateMember = async (req, res) => {
     await target.save();
     await target.populate("userId", "firstName lastName email");
 
+    // Send notification
+    const grantedPerms = [];
+    const revokedPerms = [];
+    if (permissions) {
+      for (const key of Object.keys(permissions)) {
+        if (permissions[key]) grantedPerms.push(key);
+        else revokedPerms.push(key);
+      }
+    }
+
+    if (grantedPerms.length > 0) {
+      notifyAccountMembers(
+        req.params.id,
+        "permission_granted",
+        req.user.id,
+        `${req.user.firstName} ${req.user.familyName}`.trim(),
+        {
+          memberId: target._id,
+          memberName:
+            target.displayName || target.userId?.firstName || "Unknown",
+          memberEmail: target.userId?.email,
+          permissions: grantedPerms.join(", "),
+        },
+      ).catch((err) => console.error("Notification error:", err));
+    }
+
+    if (revokedPerms.length > 0) {
+      notifyAccountMembers(
+        req.params.id,
+        "permission_revoked",
+        req.user.id,
+        `${req.user.firstName} ${req.user.familyName}`.trim(),
+        {
+          memberId: target._id,
+          memberName:
+            target.displayName || target.userId?.firstName || "Unknown",
+          memberEmail: target.userId?.email,
+          permissions: revokedPerms.join(", "),
+        },
+      ).catch((err) => console.error("Notification error:", err));
+    }
+
     res.status(200).json({ success: true, data: target });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -315,6 +374,20 @@ export const removeMember = async (req, res) => {
     }
 
     await target.deleteOne();
+
+    // Send notification
+    const targetName = target.displayName || "Unknown";
+    notifyAccountMembers(
+      req.params.id,
+      "member_removed",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        memberId: target._id,
+        memberName: targetName,
+        removedBy: isSelf ? "self" : "owner",
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({ success: true, data: {} });
   } catch (error) {
@@ -455,6 +528,20 @@ export const transferOwnership = async (req, res) => {
       targetDescription: `Ownership transfer initiated to ${normalizedEmail}`,
       metadata: { toEmail: normalizedEmail },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "ownership_transfer_initiated",
+      req.user.id,
+      inviterName,
+      {
+        toEmail: normalizedEmail,
+        fromName: inviterName,
+        toWhatsApp,
+        toTelegram,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,

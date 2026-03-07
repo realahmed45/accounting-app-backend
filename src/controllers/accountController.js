@@ -448,6 +448,87 @@ export const createCategory = async (req, res) => {
   }
 };
 
+// @desc    Update category name
+// @route   PUT /api/accounts/:id/categories/:categoryId
+// @access  Private (owner or addCategories permission)
+export const updateCategory = async (req, res) => {
+  try {
+    const account = await Account.findById(req.params.id);
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found",
+      });
+    }
+
+    // Caller must have addCategories permission or be owner
+    const member = await AccountMember.findOne({
+      accountId: req.params.id,
+      userId: req.user.id,
+    });
+
+    if (
+      !member ||
+      (member.role !== "owner" && !member.permissions.addCategories)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to edit categories",
+      });
+    }
+
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Category name is required",
+      });
+    }
+
+    // Check if category exists and belongs to this account
+    const category = await Category.findOne({
+      _id: req.params.categoryId,
+      accountId: req.params.id,
+    });
+
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    // Check if new name already exists in this account (excluding current category)
+    const existingCategory = await Category.findOne({
+      accountId: req.params.id,
+      name: name.trim(),
+      _id: { $ne: req.params.categoryId },
+    });
+
+    if (existingCategory) {
+      return res.status(400).json({
+        success: false,
+        message: "A category with this name already exists",
+      });
+    }
+
+    category.name = name.trim();
+    await category.save();
+
+    res.status(200).json({
+      success: true,
+      data: category,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // @desc    Get people for an account
 // @route   GET /api/accounts/:id/people
 // @access  Private

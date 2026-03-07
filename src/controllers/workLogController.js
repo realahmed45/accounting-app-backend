@@ -1,6 +1,7 @@
 import WorkLog from "../models/WorkLog.js";
 import ActivityLog from "../models/ActivityLog.js";
 import AccountMember from "../models/AccountMember.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 // @desc    Get work logs
 // @route   GET /api/accounts/:id/schedule/work-logs
@@ -47,7 +48,7 @@ export const create = async (req, res) => {
     // Calculate duration
     const [startH, startM] = startTime.split(":").map(Number);
     const [endH, endM] = endTime.split(":").map(Number);
-    let duration = (endH * 60 + endM) - (startH * 60 + startM);
+    let duration = endH * 60 + endM - (startH * 60 + startM);
     if (duration < 0) duration += 24 * 60; // Handle overnight
 
     const log = await WorkLog.create({
@@ -62,7 +63,7 @@ export const create = async (req, res) => {
     });
 
     // Log activity
-    const member = await AccountMember.findById(memberId);
+    const member = await AccountMember.findById(memberId).populate("userId");
     await ActivityLog.create({
       accountId: req.params.id,
       actorUserId: req.user.id,
@@ -70,6 +71,24 @@ export const create = async (req, res) => {
       action: "work_log_added",
       targetDescription: `Added work log for ${member.displayName}: ${duration} mins on ${new Date(date).toLocaleDateString()}`,
     });
+
+    // Send notification
+    notifyAccountMembers(
+      req.params.id,
+      "work_log_added",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        workLogId: log._id,
+        memberId,
+        memberName: member.displayName,
+        date: new Date(date),
+        startTime,
+        endTime,
+        duration,
+        note,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(201).json({
       success: true,
@@ -93,7 +112,28 @@ export const remove = async (req, res) => {
       accountId: req.params.id,
     });
 
-    if (!log) return res.status(404).json({ success: false, message: "Work log not found" });
+    if (!log)
+      return res
+        .status(404)
+        .json({ success: false, message: "Work log not found" });
+
+    // Send notification
+    const member = await AccountMember.findById(log.memberId);
+    notifyAccountMembers(
+      req.params.id,
+      "work_log_deleted",
+      req.user.id,
+      `${req.user.firstName} ${req.user.familyName}`.trim(),
+      {
+        workLogId: log._id,
+        memberId: log.memberId,
+        memberName: member?.displayName || "Unknown",
+        date: log.date,
+        startTime: log.startTime,
+        endTime: log.endTime,
+        duration: log.durationMinutes,
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     res.status(200).json({
       success: true,

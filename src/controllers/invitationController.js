@@ -6,6 +6,7 @@ import OwnershipTransferRequest from "../models/OwnershipTransferRequest.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../middleware/auth.js";
 import { logActivity } from "../utils/activityLogger.js";
+import { notifyAccountMembers } from "../services/notificationService.js";
 
 const ALL_PERMISSIONS = {
   calculateCash: true,
@@ -284,6 +285,22 @@ export const acceptInvitation = async (req, res) => {
         },
       });
 
+      // Send notification
+      const originalOwner = await User.findById(invitation.invitedByUserId);
+      notifyAccountMembers(
+        accountId.toString(),
+        "ownership_transfer_completed",
+        user._id,
+        `${first} ${last}`.trim(),
+        {
+          newOwnerEmail: invitation.email,
+          newOwnerName: `${first} ${last}`.trim(),
+          previousOwnerName: originalOwner
+            ? `${originalOwner.firstName} ${originalOwner.familyName}`.trim()
+            : "Previous Owner",
+        },
+      ).catch((err) => console.error("Notification error:", err));
+
       invitation.status = "accepted";
       await invitation.save();
 
@@ -322,6 +339,21 @@ export const acceptInvitation = async (req, res) => {
       targetDescription: `${invitation.email} accepted invitation`,
       metadata: { userId: user._id, email: invitation.email },
     });
+
+    // Send notification
+    notifyAccountMembers(
+      invitation.accountId._id.toString(),
+      "member_joined",
+      user._id,
+      `${first} ${last}`.trim(),
+      {
+        memberEmail: invitation.email,
+        memberName: invitation.displayName || `${first} ${last}`.trim(),
+        permissions: Object.keys(invitation.permissions)
+          .filter((k) => invitation.permissions[k])
+          .join(", "),
+      },
+    ).catch((err) => console.error("Notification error:", err));
 
     invitation.status = "accepted";
     await invitation.save();
@@ -369,7 +401,8 @@ export const resendInvitation = async (req, res) => {
       });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://accounting-app-lyart.vercel.app";
     const inviteLink = `${frontendUrl}?invite=1&token=${invitation.token}`;
     const inviterFirst = invitation.invitedByUserId?.firstName || "";
     const inviterLast =
