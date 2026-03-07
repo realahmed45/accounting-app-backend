@@ -42,24 +42,20 @@ export const submit = async (req, res) => {
     // Validation: Must have checked in first
     const checkIn = await ShiftCheckIn.findOne({ shiftId });
     if (!checkIn) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message:
-            "No check-in found for this shift. You must check in before checking out.",
-        });
+      return res.status(400).json({
+        success: false,
+        message:
+          "No check-in found for this shift. You must check in before checking out.",
+      });
     }
 
     // Validation: One check-out per shift
     const existing = await ShiftCheckOut.findOne({ shiftId });
     if (existing) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Check-out already submitted for this shift",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Check-out already submitted for this shift",
+      });
     }
 
     const checkOut = await ShiftCheckOut.create({
@@ -77,9 +73,7 @@ export const submit = async (req, res) => {
       accountId,
       actorUserId: req.user.id,
       actorDisplayName: member.displayName,
-      action: "shift_checkin_submitted", // Using existing enum or should I add shift_checkout_submitted?
-      // Actually ActivityLog.js enum has shift_checkin_submitted but not shift_checkout_submitted.
-      // I should add it to the enum if possible, or use a generic one.
+      action: "shift_checkout_submitted",
       targetDescription: `Checked out from shift on ${new Date(shift.date).toLocaleDateString()}`,
     });
 

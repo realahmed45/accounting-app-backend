@@ -31,6 +31,8 @@ const activityLogSchema = new mongoose.Schema(
         "ownership_correction_requested",
         "week_created",
         "week_locked",
+        "cash_added",
+        "bank_transfer",
         "bank_account_added",
         "bank_account_removed",
         "account_settings_changed",
