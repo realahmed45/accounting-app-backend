@@ -14,6 +14,7 @@ import invitationRoutes from "./routes/invitations.js";
 import scheduleRoutes from "./routes/schedule.js";
 import dailyActivityRoutes from "./routes/dailyActivity.js";
 import notificationRoutes from "./routes/notifications.js";
+import sampleDataRoutes from "./routes/sampleData.js";
 
 // Load env vars
 dotenv.config();
@@ -40,6 +41,7 @@ app.use("/api/invitations", invitationRoutes);
 app.use("/api/accounts", scheduleRoutes);
 app.use("/api/accounts", dailyActivityRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/accounts/:id/sample-data", sampleDataRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {
