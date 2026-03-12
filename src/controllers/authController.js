@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Subscription from "../models/Subscription.js";
 import { generateToken } from "../middleware/auth.js";
 
 // @desc    Register new user
@@ -6,7 +7,7 @@ import { generateToken } from "../middleware/auth.js";
 // @access  Public
 export const register = async (req, res) => {
   try {
-    const { email, password, firstName, middleName, familyName, phoneNumber } =
+    const { email, password, firstName, middleName, familyName, phoneNumber, selectedPlan } =
       req.body;
 
     // Check if user already exists
@@ -29,6 +30,14 @@ export const register = async (req, res) => {
       phoneNumber,
     });
 
+    // Create subscription with selected plan (default to free if not provided)
+    const plan = selectedPlan || "free";
+    const subscription = await Subscription.create({
+      userId: user._id,
+      currentPlan: plan,
+      status: "active",
+    });
+
     // Generate token
     const token = generateToken(user._id);
 
@@ -43,6 +52,10 @@ export const register = async (req, res) => {
           familyName: user.familyName,
           fullName: user.fullName,
           phoneNumber: user.phoneNumber,
+        },
+        subscription: {
+          plan: subscription.currentPlan,
+          status: subscription.status,
         },
         token,
       },
