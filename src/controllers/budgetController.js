@@ -1,7 +1,7 @@
 import Budget from "../models/Budget.js";
 import Expense from "../models/Expense.js";
 import { logActivity } from "../utils/activityLogger.js";
-import { sendNotification } from "./notificationController.js";
+import { createNotification } from "../services/notificationService.js";
 
 /**
  * @desc    Get all budgets for an account
@@ -321,13 +321,19 @@ async function sendBudgetAlert(accountId, budget, percentage, userId) {
       ? `⚠️ Budget "${budget.name}" has been exceeded! Spent: $${budget.spent.toFixed(2)} / $${budget.amount.toFixed(2)}`
       : `⚠️ Budget "${budget.name}" is ${percentage}% spent ($${budget.spent.toFixed(2)} / $${budget.amount.toFixed(2)})`;
 
-  await sendNotification({
+  await createNotification({
     userId,
     accountId,
     type: "budget_alert",
     title: `Budget Alert: ${budget.name}`,
     message,
-    priority: percentage >= 100 ? "high" : "normal",
-    actionUrl: `/accounts/${accountId}/budgets`,
+    priority: percentage >= 100 ? "high" : "medium",
+    data: {
+      budgetId: budget._id,
+      budgetName: budget.name,
+      percentage,
+      spent: budget.spent,
+      limit: budget.amount,
+    },
   });
 }
