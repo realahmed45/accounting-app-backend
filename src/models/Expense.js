@@ -44,6 +44,31 @@ const expenseSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // New fields for SaaS features
+    tags: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Tag",
+      },
+    ],
+    isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    recurringExpenseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "RecurringExpense",
+      default: null,
+    },
+    currency: {
+      type: String,
+      default: "USD",
+      uppercase: true,
+    },
+    exchangeRate: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
@@ -53,6 +78,8 @@ const expenseSchema = new mongoose.Schema(
 // Indexes for faster queries
 expenseSchema.index({ accountId: 1, date: -1 });
 expenseSchema.index({ weekId: 1 });
+expenseSchema.index({ tags: 1 });
+expenseSchema.index({ isRecurring: 1 });
 
 const Expense = mongoose.model("Expense", expenseSchema);
 

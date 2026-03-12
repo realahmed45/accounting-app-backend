@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "clean-db": "node src/utils/cleanDatabase.js"
+    "clean-db": "node src/utils/cleanDatabase.js",
+    "reset-db": "node src/migrations/dropDatabase.js"
   },
   "keywords": [
     "accounting",

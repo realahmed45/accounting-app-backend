@@ -4,7 +4,7 @@ import {
   seedSampleExpenses,
   clearSampleData,
 } from "../services/sampleDataSeeder.js";
-import { logActivity } from "../services/activityLogger.js";
+import { logActivity } from "../utils/activityLogger.js";
 
 /**
  * @desc    Seed all sample data for an account

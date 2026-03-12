@@ -15,6 +15,13 @@ import scheduleRoutes from "./routes/schedule.js";
 import dailyActivityRoutes from "./routes/dailyActivity.js";
 import notificationRoutes from "./routes/notifications.js";
 import sampleDataRoutes from "./routes/sampleData.js";
+import subscriptionRoutes from "./routes/subscription.js";
+import tagRoutes from "./routes/tags.js";
+import budgetRoutes from "./routes/budgets.js";
+import recurringExpenseRoutes from "./routes/recurringExpenses.js";
+import advancedSearchRoutes from "./routes/advancedSearch.js";
+import bulkOperationsRoutes from "./routes/bulkOperations.js";
+import dataExportRoutes from "./routes/dataExport.js";
 
 // Load env vars
 dotenv.config();
@@ -42,6 +49,13 @@ app.use("/api/accounts", scheduleRoutes);
 app.use("/api/accounts", dailyActivityRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/accounts/:id/sample-data", sampleDataRoutes);
+app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/accounts/:id/tags", tagRoutes);
+app.use("/api/accounts/:id/budgets", budgetRoutes);
+app.use("/api/accounts/:id/recurring-expenses", recurringExpenseRoutes);
+app.use("/api/accounts/:id/search", advancedSearchRoutes);
+app.use("/api/accounts/:id/bulk", bulkOperationsRoutes);
+app.use("/api/accounts/:id/export", dataExportRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {
