@@ -7,8 +7,15 @@ import { generateToken } from "../middleware/auth.js";
 // @access  Public
 export const register = async (req, res) => {
   try {
-    const { email, password, firstName, middleName, familyName, phoneNumber, selectedPlan } =
-      req.body;
+    const {
+      email,
+      password,
+      firstName,
+      middleName,
+      familyName,
+      phoneNumber,
+      selectedPlan,
+    } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
