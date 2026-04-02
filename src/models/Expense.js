@@ -44,6 +44,29 @@ const expenseSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // New UI fields
+    referenceNumber: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    paymentMode: {
+      type: String,
+      trim: true,
+      default: "Cash",
+    },
+    paymentStatus: {
+      type: String,
+      enum: [
+        "Expense",
+        "Deposit Received",
+        "Expense from acc",
+        "CASH box increased F acc",
+        "CASH box increased W cash",
+        "Transfer from acc to acc",
+      ],
+      default: "Expense",
+    },
     // New fields for SaaS features
     tags: [
       {

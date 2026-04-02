@@ -20,6 +20,9 @@ export const createExpense = async (req, res) => {
       note,
       paymentSource,
       bankAccountId,
+      referenceNumber,
+      paymentMode,
+      paymentStatus,
     } = req.body;
 
     // Verify account membership
@@ -108,6 +111,9 @@ export const createExpense = async (req, res) => {
       paymentSource: paymentSource || "cash",
       bankAccountId: paymentSource === "bank" ? bankAccountId : null,
       userId: req.user.id,
+      referenceNumber: referenceNumber || null,
+      paymentMode: paymentMode || "Cash",
+      paymentStatus: paymentStatus || "Expense",
     });
 
     console.log("\n💰 EXPENSE CREATED!");
